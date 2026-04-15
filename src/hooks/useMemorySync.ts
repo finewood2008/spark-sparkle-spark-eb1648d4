@@ -97,6 +97,8 @@ export function useMemorySync() {
     }
     currentUserId.current = userId;
     loadData();
+    // Also sync user preferences from cloud
+    syncPrefsFromCloud();
   }, [isAuthenticated, user?.id, loadData]);
 
   // Save brand when it changes
