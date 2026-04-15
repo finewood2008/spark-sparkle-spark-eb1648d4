@@ -104,7 +104,7 @@ export function useMemorySync() {
     savingBrand.current = true;
     try {
       const id = getIdentifier();
-      const row: Record<string, unknown> = {
+      const baseRow = {
         device_id: DEVICE_ID,
         name: b.name,
         industry: b.industry,
@@ -117,11 +117,10 @@ export function useMemorySync() {
         initialized: b.initialized,
         init_step: b.initStep,
         updated_at: new Date().toISOString(),
+        user_id: id.column === 'user_id' ? id.value : undefined,
       };
 
       if (id.column === 'user_id') {
-        row.user_id = id.value;
-        // Try update first by user_id, then insert
         const { data: existing } = await supabase
           .from('brand_memories')
           .select('id')
@@ -131,17 +130,17 @@ export function useMemorySync() {
         if (existing) {
           await supabase
             .from('brand_memories')
-            .update(row)
+            .update(baseRow)
             .eq('id', existing.id);
         } else {
           await supabase
             .from('brand_memories')
-            .insert(row);
+            .insert(baseRow);
         }
       } else {
         await supabase
           .from('brand_memories')
-          .upsert(row, { onConflict: 'device_id' });
+          .upsert(baseRow, { onConflict: 'device_id' });
       }
     } finally {
       savingBrand.current = false;
