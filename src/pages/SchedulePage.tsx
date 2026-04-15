@@ -54,6 +54,7 @@ function loadSchedule(): ScheduleConfig {
     topics: [],
     style: '',
     postsPerDay: 1,
+    scheduledTimes: ['09:00'],
   };
 }
 
