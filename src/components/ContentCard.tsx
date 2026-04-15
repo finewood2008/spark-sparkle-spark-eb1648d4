@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
@@ -66,6 +66,7 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
+  const [titleLoading, setTitleLoading] = useState(false);
   const { contents, setContents, learnings, setLearnings, addMessage } = useAppStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -248,6 +249,71 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
     }
     setCoverLoading(false);
   };
+  const handleRegenerateTitle = async () => {
+    setTitleLoading(true);
+    try {
+      const currentContent = editing ? editContent : item.content;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: `请根据以下文章内容，重新生成一个吸引人的标题。只返回标题文字，不要任何解释或引号：\n\n${currentContent.substring(0, 500)}` }],
+          mode: 'chat',
+          platform: item.platform,
+        }),
+      });
+
+      if (!resp.ok) {
+        toast.error('标题生成失败');
+        setTitleLoading(false);
+        return;
+      }
+
+      const reader = resp.body?.getReader();
+      const decoder = new TextDecoder();
+      let newTitle = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try {
+                const json = JSON.parse(line.slice(6));
+                const delta = json.choices?.[0]?.delta?.content;
+                if (delta) newTitle += delta;
+              } catch {}
+            }
+          }
+        }
+      }
+
+      newTitle = newTitle.trim().replace(/^["'""'']+|["'""'']+$/g, '');
+      if (newTitle) {
+        if (editing) {
+          setEditTitle(newTitle);
+        }
+        const updated = contents.map(c =>
+          c.id === item.id
+            ? { ...c, title: newTitle, updatedAt: new Date().toISOString() }
+            : c
+        );
+        setContents(updated);
+        toast.success('标题已更新');
+      } else {
+        toast.error('未能生成新标题');
+      }
+    } catch {
+      toast.error('标题生成失败');
+    }
+    setTitleLoading(false);
+  };
 
   const handleSave = () => {
     const updated = contents.map(c =>
@@ -377,13 +443,33 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
 
       {/* Title */}
       {editing ? (
-        <input
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
-          className="w-full text-[15px] font-semibold text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-1.5 mb-2 outline-none focus:border-spark-orange"
-        />
+        <div className="flex items-center gap-1.5 mb-2">
+          <input
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="flex-1 text-[15px] font-semibold text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-1.5 outline-none focus:border-spark-orange"
+          />
+          <button
+            onClick={handleRegenerateTitle}
+            disabled={titleLoading}
+            className="shrink-0 p-1.5 rounded-lg text-[#999] hover:text-spark-orange hover:bg-spark-orange/10 transition-colors disabled:opacity-40"
+            title="重新生成标题"
+          >
+            {titleLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          </button>
+        </div>
       ) : (
-        <h4 className="text-[15px] font-semibold text-[#333] mb-2">{item.title}</h4>
+        <div className="flex items-center gap-1.5 mb-2 group">
+          <h4 className="text-[15px] font-semibold text-[#333] flex-1">{item.title}</h4>
+          <button
+            onClick={handleRegenerateTitle}
+            disabled={titleLoading}
+            className="shrink-0 p-1 rounded-md text-[#CCC] hover:text-spark-orange hover:bg-spark-orange/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-40"
+            title="重新生成标题"
+          >
+            {titleLoading ? <Loader2 size={13} className="animate-spin text-spark-orange" /> : <RefreshCw size={13} />}
+          </button>
+        </div>
       )}
 
       {/* Content */}
