@@ -4,7 +4,7 @@ import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe
 import { useAuthStore } from '@/store/authStore';
 import { getBindingStatus, bindThirdPartyAccount, unbindThirdPartyAccount, type BindingStatus, type SocialProvider } from '@/services/authService';
 import { toast } from 'sonner';
-import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs } from '@/lib/user-prefs';
+import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs, syncPrefsFromCloud } from '@/lib/user-prefs';
 
 export const Route = createFileRoute('/account')({
   head: () => ({
@@ -37,7 +37,8 @@ function AccountPage() {
       return;
     }
     getBindingStatus(user!.id).then(setBindings);
-    setPrefs(loadUserPrefs());
+    // Load prefs from cloud first, fallback to local
+    syncPrefsFromCloud().then(setPrefs);
   }, [isAuthenticated, navigate, user]);
 
   const handleBind = async (provider: SocialProvider) => {
@@ -240,9 +241,10 @@ function AccountPage() {
 
             {/* Save */}
             <button
-              onClick={() => {
-                saveUserPrefs(prefs);
+              onClick={async () => {
+                await saveUserPrefs(prefs);
                 setPrefsSaved(true);
+                toast.success('偏好已保存并同步到云端');
                 setTimeout(() => setPrefsSaved(false), 2000);
               }}
               className="spark-btn-primary w-full text-sm gap-1.5"

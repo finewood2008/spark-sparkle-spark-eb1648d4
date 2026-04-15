@@ -1,5 +1,8 @@
 /** Shared user preferences – used by account page & AI generation */
 
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
+
 export interface UserPreferences {
   defaultPlatform: 'xiaohongshu' | 'wechat' | 'douyin';
   writingStyle: string;
@@ -16,6 +19,7 @@ export const defaultPrefs: UserPreferences = {
 
 const STORAGE_KEY = 'spark-user-prefs';
 
+/** Load from localStorage (instant, offline-friendly) */
 export function loadUserPrefs(): UserPreferences {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
@@ -25,8 +29,61 @@ export function loadUserPrefs(): UserPreferences {
   }
 }
 
-export function saveUserPrefs(p: UserPreferences) {
+/** Save to localStorage */
+function saveLocal(p: UserPreferences) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+}
+
+/** Save to both localStorage and database (if logged in) */
+export async function saveUserPrefs(p: UserPreferences) {
+  saveLocal(p);
+  const { user, isAuthenticated } = useAuthStore.getState();
+  if (!isAuthenticated || !user?.id) return;
+
+  const row = {
+    user_id: user.id,
+    default_platform: p.defaultPlatform,
+    writing_style: p.writingStyle,
+    writing_tone: p.writingTone,
+    signature: p.signature,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existing } = await supabase
+    .from('user_preferences')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase.from('user_preferences').update(row).eq('id', existing.id);
+  } else {
+    await supabase.from('user_preferences').insert(row);
+  }
+}
+
+/** Load from database and merge into localStorage. Returns the merged prefs. */
+export async function syncPrefsFromCloud(): Promise<UserPreferences> {
+  const { user, isAuthenticated } = useAuthStore.getState();
+  if (!isAuthenticated || !user?.id) return loadUserPrefs();
+
+  const { data } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (data) {
+    const prefs: UserPreferences = {
+      defaultPlatform: (data.default_platform as UserPreferences['defaultPlatform']) || defaultPrefs.defaultPlatform,
+      writingStyle: data.writing_style || defaultPrefs.writingStyle,
+      writingTone: data.writing_tone || defaultPrefs.writingTone,
+      signature: data.signature || defaultPrefs.signature,
+    };
+    saveLocal(prefs);
+    return prefs;
+  }
+  return loadUserPrefs();
 }
 
 /** Build a context string for AI prompts */
