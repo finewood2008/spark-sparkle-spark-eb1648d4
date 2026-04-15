@@ -443,13 +443,33 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
 
       {/* Title */}
       {editing ? (
-        <input
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
-          className="w-full text-[15px] font-semibold text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-1.5 mb-2 outline-none focus:border-spark-orange"
-        />
+        <div className="flex items-center gap-1.5 mb-2">
+          <input
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="flex-1 text-[15px] font-semibold text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-1.5 outline-none focus:border-spark-orange"
+          />
+          <button
+            onClick={handleRegenerateTitle}
+            disabled={titleLoading}
+            className="shrink-0 p-1.5 rounded-lg text-[#999] hover:text-spark-orange hover:bg-spark-orange/10 transition-colors disabled:opacity-40"
+            title="重新生成标题"
+          >
+            {titleLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          </button>
+        </div>
       ) : (
-        <h4 className="text-[15px] font-semibold text-[#333] mb-2">{item.title}</h4>
+        <div className="flex items-center gap-1.5 mb-2 group">
+          <h4 className="text-[15px] font-semibold text-[#333] flex-1">{item.title}</h4>
+          <button
+            onClick={handleRegenerateTitle}
+            disabled={titleLoading}
+            className="shrink-0 p-1 rounded-md text-[#CCC] hover:text-spark-orange hover:bg-spark-orange/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-40"
+            title="重新生成标题"
+          >
+            {titleLoading ? <Loader2 size={13} className="animate-spin text-spark-orange" /> : <RefreshCw size={13} />}
+          </button>
+        </div>
       )}
 
       {/* Content */}
