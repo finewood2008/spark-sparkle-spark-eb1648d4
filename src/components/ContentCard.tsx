@@ -114,8 +114,8 @@ export default function ContentCard({ item }: ContentCardProps) {
     const selectedText = editContent.substring(selectedRange.start, selectedRange.end);
     if (!selectedText.trim()) return;
 
+    setUndoStack(prev => [...prev, editContent]);
     setAiLoading(action);
-    let result = '';
 
     await streamEdit({
       action,
