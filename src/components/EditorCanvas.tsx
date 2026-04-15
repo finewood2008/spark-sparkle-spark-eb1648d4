@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem, Platform } from '../types/spark';
+import { streamEdit } from '../lib/ai-stream';
 import {
   Sparkles,
   Plus,
@@ -12,40 +13,88 @@ import {
   Maximize2,
   Minimize2,
   FileText,
+  Loader2,
+  Type,
+  Hash,
+  MousePointerClick,
+  PenLine,
+  ChevronsRight,
+  ImagePlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// --- Inline AI Toolbar ---
+// --- AI Floating Toolbar (text selection) ---
 function AIFloatingToolbar({
   position,
   onAction,
+  loading,
 }: {
   position: { top: number; left: number };
   onAction: (action: string) => void;
+  loading: boolean;
 }) {
   const actions = [
-    { id: 'rewrite', label: 'AI 改写', icon: <Wand2 size={12} /> },
+    { id: 'rewrite', label: '改写', icon: <Wand2 size={12} /> },
     { id: 'expand', label: '扩写', icon: <Maximize2 size={12} /> },
     { id: 'simplify', label: '精简', icon: <Minimize2 size={12} /> },
   ];
 
   return (
     <div
-      className="fixed z-50 flex items-center gap-1 bg-spark-surface border border-spark-gray-200 rounded-lg shadow-lg px-1.5 py-1"
+      className="fixed z-50 flex items-center gap-0.5 bg-spark-surface border border-spark-gray-200 rounded-lg shadow-lg px-1.5 py-1"
       style={{
         top: position.top - 44,
-        left: position.left,
+        left: Math.max(8, position.left),
         animation: 'spark-fade-in 0.15s ease',
       }}
     >
-      <Sparkles size={12} className="text-spark-orange mr-1" />
+      {loading && <Loader2 size={12} className="text-spark-orange animate-spin mr-1" />}
+      {!loading && <Sparkles size={12} className="text-spark-orange mr-1" />}
       {actions.map((a) => (
         <button
           key={a.id}
           onClick={() => onAction(a.id)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-spark-gray-600 hover:bg-spark-warm hover:text-spark-orange transition-colors"
+          disabled={loading}
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-spark-gray-600 hover:bg-spark-warm hover:text-spark-orange transition-colors disabled:opacity-40"
         >
           {a.icon}
+          {a.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// --- AI Action Bar (below editor) ---
+function AIActionBar({
+  onAction,
+  loading,
+  loadingAction,
+}: {
+  onAction: (action: string) => void;
+  loading: boolean;
+  loadingAction: string | null;
+}) {
+  const actions = [
+    { id: 'polish', label: '润色全文', icon: <PenLine size={13} /> },
+    { id: 'continue', label: '续写', icon: <ChevronsRight size={13} /> },
+    { id: 'generate_title', label: '生成标题', icon: <Type size={13} /> },
+    { id: 'generate_tags', label: '生成标签', icon: <Hash size={13} /> },
+    { id: 'generate_cta', label: '生成CTA', icon: <MousePointerClick size={13} /> },
+  ];
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <Sparkles size={13} className="text-spark-orange shrink-0" />
+      <span className="text-[11px] text-spark-gray-400 mr-1">AI 编辑：</span>
+      {actions.map((a) => (
+        <button
+          key={a.id}
+          onClick={() => onAction(a.id)}
+          disabled={loading}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-spark-gray-100 text-spark-gray-600 hover:bg-spark-warm hover:text-spark-orange transition-colors disabled:opacity-40"
+        >
+          {loadingAction === a.id ? <Loader2 size={12} className="animate-spin" /> : a.icon}
           {a.label}
         </button>
       ))}
@@ -76,10 +125,7 @@ function DraftDropdown({
       <div className="absolute top-full left-0 mt-1 w-72 bg-spark-surface border border-spark-gray-200 rounded-xl shadow-xl z-40 overflow-hidden" style={{ animation: 'spark-fade-in 0.15s ease' }}>
         <div className="p-2 border-b border-spark-gray-100 flex items-center justify-between">
           <span className="text-xs font-semibold text-spark-gray-500">草稿列表</span>
-          <button
-            onClick={onCreate}
-            className="w-6 h-6 rounded-md bg-spark-warm text-spark-orange flex items-center justify-center hover:bg-spark-orange hover:text-primary-foreground transition-colors"
-          >
+          <button onClick={onCreate} className="w-6 h-6 rounded-md bg-spark-warm text-spark-orange flex items-center justify-center hover:bg-spark-orange hover:text-primary-foreground transition-colors">
             <Plus size={14} />
           </button>
         </div>
@@ -92,9 +138,7 @@ function DraftDropdown({
               key={item.id}
               onClick={() => { onSelect(item.id); onClose(); }}
               className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
-                selectedId === item.id
-                  ? 'bg-spark-warm text-spark-orange'
-                  : 'hover:bg-spark-gray-100 text-spark-gray-600'
+                selectedId === item.id ? 'bg-spark-warm text-spark-orange' : 'hover:bg-spark-gray-100 text-spark-gray-600'
               }`}
             >
               <div className="font-medium truncate flex items-center gap-1">
@@ -120,19 +164,20 @@ export default function EditorCanvas() {
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [toolbarPos, setToolbarPos] = useState<{ top: number; left: number } | null>(null);
   const [selectedText, setSelectedText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoadingAction, setAiLoadingAction] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedContent = contents.find((c) => c.id === selectedContentId);
 
-  const updateContent = (updates: Partial<ContentItem>) => {
-    if (!selectedContent) return;
-    const updated: ContentItem = {
-      ...selectedContent,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    setContents(contents.map((c) => (c.id === updated.id ? updated : c)));
-  };
+  const updateContent = useCallback((updates: Partial<ContentItem>) => {
+    const store = useAppStore.getState();
+    const current = store.contents.find(c => c.id === store.selectedContentId);
+    if (!current) return;
+    const updated: ContentItem = { ...current, ...updates, updatedAt: new Date().toISOString() };
+    useAppStore.getState().setContents(store.contents.map((c) => c.id === updated.id ? updated : c));
+  }, []);
 
   const createNew = () => {
     const newItem: ContentItem = {
@@ -153,19 +198,22 @@ export default function EditorCanvas() {
 
   const handlePublish = () => {
     if (!selectedContent) return;
-    updateContent({
-      status: 'published',
-      publishedAt: new Date().toISOString(),
-    });
+    updateContent({ status: 'published', publishedAt: new Date().toISOString() });
     toast.success('内容已发布！');
   };
 
-  // Text selection detection for AI floating toolbar
+  const getBrandContext = useCallback(() => {
+    const store = useAppStore.getState();
+    if (!store.brand || !store.brand.initialized) return '';
+    const b = store.brand;
+    return `\n品牌: ${b.name}\n语气: ${b.toneOfVoice}\n关键词: ${b.keywords.join(', ')}`;
+  }, []);
+
+  // Text selection detection
   const handleMouseUp = useCallback(() => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-      // Delay hiding to allow button clicks
-      setTimeout(() => setToolbarPos(null), 150);
+      setTimeout(() => setToolbarPos(null), 200);
       return;
     }
     const text = selection.toString().trim();
@@ -176,31 +224,118 @@ export default function EditorCanvas() {
     setSelectedText(text);
     setToolbarPos({
       top: rect.top + window.scrollY,
-      left: rect.left + rect.width / 2 - 120,
+      left: rect.left + rect.width / 2 - 100,
     });
   }, []);
 
-  const handleToolbarAction = (action: string) => {
-    if (!selectedText || !selectedContent) return;
-    const actionLabels: Record<string, string> = {
-      rewrite: 'AI 改写',
-      expand: '扩写',
-      simplify: '精简',
-    };
-    toast.info(`正在${actionLabels[action] || action}选中文本...`);
-    setToolbarPos(null);
-    // The actual AI call would go through the command panel
-  };
+  // Handle inline text editing (rewrite/expand/simplify selected text)
+  const handleInlineEdit = useCallback(async (action: string) => {
+    if (!selectedContent || !selectedText) return;
 
-  // Platform labels
-  const platformLabel = (p: Platform) =>
-    p === 'xiaohongshu' ? '小红书' : p === 'wechat' ? '公众号' : '抖音';
+    setAiLoading(true);
+    setAiLoadingAction(action);
+    let result = '';
+
+    await streamEdit({
+      action,
+      text: selectedText,
+      fullContent: selectedContent.content,
+      platform: selectedContent.platform,
+      brandContext: getBrandContext(),
+      onDelta: (chunk) => { result += chunk; },
+      onDone: () => {
+        if (result) {
+          const newContent = selectedContent.content.replace(selectedText, result.trim());
+          updateContent({ content: newContent });
+          toast.success(`${action === 'rewrite' ? '改写' : action === 'expand' ? '扩写' : '精简'}完成`);
+        }
+        setAiLoading(false);
+        setAiLoadingAction(null);
+        setToolbarPos(null);
+      },
+      onError: (err) => {
+        toast.error(err);
+        setAiLoading(false);
+        setAiLoadingAction(null);
+      },
+    });
+  }, [selectedContent, selectedText, getBrandContext, updateContent]);
+
+  // Handle action bar AI operations
+  const handleActionBarEdit = useCallback(async (action: string) => {
+    if (!selectedContent) return;
+    if (!selectedContent.content && action !== 'generate_title') {
+      toast.error('请先添加一些内容');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiLoadingAction(action);
+    let result = '';
+
+    await streamEdit({
+      action,
+      text: selectedContent.content,
+      fullContent: selectedContent.content,
+      platform: selectedContent.platform,
+      brandContext: getBrandContext(),
+      onDelta: (chunk) => { result += chunk; },
+      onDone: () => {
+        const trimmed = result.trim();
+        if (!trimmed) {
+          setAiLoading(false);
+          setAiLoadingAction(null);
+          return;
+        }
+
+        switch (action) {
+          case 'polish':
+            updateContent({ content: trimmed });
+            toast.success('全文润色完成');
+            break;
+          case 'continue':
+            updateContent({ content: selectedContent.content + '\n\n' + trimmed });
+            toast.success('续写完成');
+            break;
+          case 'generate_title': {
+            const titles = trimmed.split('\n').filter(Boolean);
+            if (titles.length > 0) {
+              updateContent({ title: titles[0].trim() });
+              if (titles.length > 1) {
+                toast.success(`已生成标题，还有 ${titles.length - 1} 个备选`);
+              } else {
+                toast.success('标题已生成');
+              }
+            }
+            break;
+          }
+          case 'generate_tags': {
+            const tags = trimmed.split('\n').map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+            updateContent({ tags });
+            toast.success(`已生成 ${tags.length} 个标签`);
+            break;
+          }
+          case 'generate_cta':
+            updateContent({ cta: trimmed });
+            toast.success('CTA 已生成');
+            break;
+        }
+
+        setAiLoading(false);
+        setAiLoadingAction(null);
+      },
+      onError: (err) => {
+        toast.error(err);
+        setAiLoading(false);
+        setAiLoadingAction(null);
+      },
+    });
+  }, [selectedContent, getBrandContext, updateContent]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-screen bg-spark-gray-50">
       {/* Top Bar */}
       <div className="h-12 border-b border-spark-gray-200 bg-spark-surface flex items-center px-4 gap-3 shrink-0">
-        {/* Draft selector */}
         <div className="relative">
           <button
             onClick={() => setDraftsOpen(!draftsOpen)}
@@ -224,14 +359,11 @@ export default function EditorCanvas() {
 
         {selectedContent && (
           <>
-            {/* AI badge */}
             {selectedContent.autoGenerated && (
               <span className="inline-flex items-center gap-1 bg-spark-orange/10 text-spark-orange text-[11px] font-medium px-2 py-0.5 rounded-full">
                 <Bot size={11} /> AI 生成
               </span>
             )}
-
-            {/* Platform */}
             <select
               value={selectedContent.platform}
               onChange={(e) => updateContent({ platform: e.target.value as Platform })}
@@ -241,10 +373,7 @@ export default function EditorCanvas() {
               <option value="wechat">公众号</option>
               <option value="douyin">抖音</option>
             </select>
-
             <div className="flex-1" />
-
-            {/* Publish */}
             {selectedContent.status === 'published' ? (
               <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'oklch(0.6 0.15 145)' }}>
                 <CheckCircle size={14} /> 已发布
@@ -279,20 +408,28 @@ export default function EditorCanvas() {
               className="w-full text-2xl font-bold text-spark-gray-800 bg-transparent border-none outline-none placeholder:text-spark-gray-300 mb-4"
             />
 
-            {/* Divider */}
             <div className="h-px bg-spark-gray-100 mb-4" />
 
             {/* Body */}
             <textarea
+              ref={bodyRef}
               value={selectedContent.content}
               onChange={(e) => updateContent({ content: e.target.value })}
-              placeholder="开始写作，或让 AI 指挥舱帮你生成内容..."
+              placeholder="开始写作，或在左侧 AI 指挥舱生成文章..."
               className="w-full min-h-[40vh] text-[15px] leading-relaxed text-spark-gray-700 bg-transparent border-none outline-none resize-none placeholder:text-spark-gray-300"
             />
 
+            {/* AI Action Bar */}
+            <div className="mt-6 pt-4 border-t border-spark-gray-100">
+              <AIActionBar
+                onAction={handleActionBarEdit}
+                loading={aiLoading}
+                loadingAction={aiLoadingAction}
+              />
+            </div>
+
             {/* Tags & CTA */}
-            <div className="mt-6 pt-4 border-t border-spark-gray-100 space-y-3">
-              {/* CTA */}
+            <div className="mt-4 pt-4 border-t border-spark-gray-100 space-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-medium text-spark-gray-400 w-10 shrink-0">CTA</span>
                 <input
@@ -302,23 +439,15 @@ export default function EditorCanvas() {
                   className="flex-1 text-sm text-spark-gray-600 bg-transparent border-none outline-none placeholder:text-spark-gray-300"
                 />
               </div>
-              {/* Tags */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-medium text-spark-gray-400 w-10 shrink-0">标签</span>
                 {(selectedContent.tags || []).map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 bg-spark-warm text-spark-orange text-xs px-2 py-0.5 rounded-full"
-                  >
+                  <span key={t} className="inline-flex items-center gap-1 bg-spark-warm text-spark-orange text-xs px-2 py-0.5 rounded-full">
                     #{t}
                     <button
-                      onClick={() =>
-                        updateContent({ tags: (selectedContent.tags || []).filter((x) => x !== t) })
-                      }
+                      onClick={() => updateContent({ tags: (selectedContent.tags || []).filter((x) => x !== t) })}
                       className="hover:text-destructive"
-                    >
-                      ×
-                    </button>
+                    >×</button>
                   </span>
                 ))}
                 <input
@@ -339,9 +468,23 @@ export default function EditorCanvas() {
             </div>
           </div>
 
+          {/* AI Loading Overlay */}
+          {aiLoading && (
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-spark-surface border border-spark-gray-200 rounded-xl shadow-lg px-4 py-2 flex items-center gap-2">
+              <Loader2 size={14} className="text-spark-orange animate-spin" />
+              <span className="text-xs text-spark-gray-600">
+                AI 正在{aiLoadingAction === 'polish' ? '润色' : aiLoadingAction === 'continue' ? '续写' : aiLoadingAction === 'generate_title' ? '生成标题' : aiLoadingAction === 'generate_tags' ? '生成标签' : aiLoadingAction === 'generate_cta' ? '生成CTA' : aiLoadingAction === 'rewrite' ? '改写' : aiLoadingAction === 'expand' ? '扩写' : '精简'}...
+              </span>
+            </div>
+          )}
+
           {/* Floating AI toolbar */}
           {toolbarPos && (
-            <AIFloatingToolbar position={toolbarPos} onAction={handleToolbarAction} />
+            <AIFloatingToolbar
+              position={toolbarPos}
+              onAction={handleInlineEdit}
+              loading={aiLoading}
+            />
           )}
         </div>
       ) : (
@@ -352,10 +495,11 @@ export default function EditorCanvas() {
             </div>
             <h3 className="text-lg font-semibold text-spark-gray-700 mb-1">开始创作</h3>
             <p className="text-sm text-spark-gray-400 mb-4">
-              在左侧 AI 指挥舱输入指令，或新建一篇草稿
+              在左侧 AI 指挥舱输入主题并生成文章<br/>
+              文章将自动保存到草稿中
             </p>
             <button onClick={createNew} className="spark-btn-primary text-sm">
-              <Plus size={16} /> 新建草稿
+              <Plus size={16} /> 新建空白草稿
             </button>
           </div>
         </div>
