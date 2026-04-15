@@ -37,6 +37,13 @@ export default function ChatLayout() {
             <FileText size={18} />
           </button>
           <button
+            onClick={() => setProfileOpen(true)}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+            title="火花记忆"
+          >
+            <Brain size={18} />
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
             title="设置"
