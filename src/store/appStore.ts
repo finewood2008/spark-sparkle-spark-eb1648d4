@@ -23,6 +23,8 @@ interface AppState {
 
   brand: BrandMemory | null;
   setBrand: (b: BrandMemory) => void;
+  brandMemoryEnabled: boolean;
+  setBrandMemoryEnabled: (v: boolean) => void;
   learnings: LearningEntry[];
   setLearnings: (l: LearningEntry[]) => void;
 }
@@ -49,6 +51,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   brand: null,
   setBrand: (brand) => set({ brand }),
+  brandMemoryEnabled: false,
+  setBrandMemoryEnabled: (v) => set({ brandMemoryEnabled: v }),
   learnings: [],
   setLearnings: (learnings) => set({ learnings }),
 }));
