@@ -69,6 +69,33 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
   const { contents, setContents, learnings, setLearnings, addMessage } = useAppStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadCover = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('请选择图片文件');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('图片不能超过 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const updated = contents.map(c =>
+        c.id === item.id
+          ? { ...c, coverImage: dataUrl, updatedAt: new Date().toISOString() }
+          : c
+      );
+      setContents(updated);
+      toast.success('封面已更新');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const previewText = item.content.split('\n').slice(0, 3).join('\n');
 
