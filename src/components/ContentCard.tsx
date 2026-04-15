@@ -116,6 +116,7 @@ export default function ContentCard({ item }: ContentCardProps) {
 
     setUndoStack(prev => [...prev, editContent]);
     setAiLoading(action);
+    let result = '';
 
     await streamEdit({
       action,
@@ -144,6 +145,7 @@ export default function ContentCard({ item }: ContentCardProps) {
     const textToPolish = editing ? editContent : item.content;
     if (!textToPolish.trim()) return;
 
+    setUndoStack(prev => [...prev, editing ? editContent : item.content]);
     setAiLoading('polish');
     if (!editing) {
       setEditing(true);
