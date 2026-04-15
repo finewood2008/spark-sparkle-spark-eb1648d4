@@ -243,6 +243,46 @@ function ScheduleConfigForm({
           placeholder="如：专业严谨、轻松幽默、清新文艺..."
         />
       </div>
+
+      {/* Scheduled Times */}
+      <div>
+        <label className="text-xs font-medium text-spark-gray-500 mb-2 block flex items-center gap-1.5">
+          <Clock size={13} /> 定时发布时间
+        </label>
+        <div className="space-y-2">
+          {(config.scheduledTimes || ['09:00']).map((time, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => {
+                  const times = [...(config.scheduledTimes || ['09:00'])];
+                  times[idx] = e.target.value;
+                  onChange({ ...config, scheduledTimes: times });
+                }}
+                className="spark-input w-auto"
+              />
+              {(config.scheduledTimes || []).length > 1 && (
+                <button
+                  onClick={() => onChange({ ...config, scheduledTimes: (config.scheduledTimes || []).filter((_, i) => i !== idx) })}
+                  className="text-spark-gray-400 hover:text-destructive"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+          {(config.scheduledTimes || []).length < 5 && (
+            <button
+              onClick={() => onChange({ ...config, scheduledTimes: [...(config.scheduledTimes || ['09:00']), '12:00'] })}
+              className="text-xs text-spark-orange hover:underline flex items-center gap-1"
+            >
+              <Plus size={12} /> 添加时间点
+            </button>
+          )}
+        </div>
+        <p className="text-[10px] text-spark-gray-300 mt-1">页面需保持打开，定时器才会触发自动生成</p>
+      </div>
     </div>
   );
 }
