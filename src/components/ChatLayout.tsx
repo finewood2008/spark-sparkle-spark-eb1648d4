@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Settings } from 'lucide-react';
+import { FileText, Settings, Brain } from 'lucide-react';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
