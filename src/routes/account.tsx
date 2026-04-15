@@ -4,7 +4,7 @@ import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe
 import { useAuthStore } from '@/store/authStore';
 import { getBindingStatus, bindThirdPartyAccount, unbindThirdPartyAccount, type BindingStatus, type SocialProvider } from '@/services/authService';
 import { toast } from 'sonner';
-import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs } from '@/lib/user-prefs';
+import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs, syncPrefsFromCloud } from '@/lib/user-prefs';
 
 export const Route = createFileRoute('/account')({
   head: () => ({
