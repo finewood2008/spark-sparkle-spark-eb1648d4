@@ -480,7 +480,13 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
               className="content-card-btn text-spark-orange"
             >
               {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-              {coverLoading ? '生成中...' : '配图'}
+              {coverLoading ? '生成中...' : 'AI配图'}
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="content-card-btn"
+            >
+              <ImageUp size={13} /> 上传
             </button>
             {undoStack.length > 0 && (
               <button onClick={handleUndo} disabled={!!aiLoading} className="content-card-btn text-[#999]">
