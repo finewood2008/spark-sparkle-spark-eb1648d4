@@ -137,3 +137,45 @@ async function processSSEStream(
 
   onDone();
 }
+
+// Non-streaming generate for schedule auto-generation
+export async function generateArticle({
+  topic,
+  platform,
+  style,
+  brandContext,
+}: {
+  topic: string;
+  platform: string;
+  style?: string;
+  brandContext?: string;
+}): Promise<{ title: string; content: string; cta: string; tags: string[] }> {
+  let raw = '';
+  await new Promise<void>((resolve, reject) => {
+    streamChat({
+      messages: [{ role: 'user', content: `请为"${topic}"这个主题生成一篇文章。${style ? `写作风格：${style}` : ''}` }],
+      mode: 'generate',
+      platform,
+      brandContext,
+      onDelta: (chunk) => { raw += chunk; },
+      onDone: () => resolve(),
+      onError: (err) => reject(new Error(err)),
+    });
+  });
+
+  let cleaned = raw.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+  }
+  try {
+    const parsed = JSON.parse(cleaned);
+    return {
+      title: parsed.title || topic,
+      content: parsed.content || raw,
+      cta: parsed.cta || '',
+      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+    };
+  } catch {
+    return { title: topic, content: raw, cta: '', tags: [] };
+  }
+}
