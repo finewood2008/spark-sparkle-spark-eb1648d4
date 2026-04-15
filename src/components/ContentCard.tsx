@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
@@ -58,6 +58,7 @@ export default function ContentCard({ item }: ContentCardProps) {
   const [toolbarPos, setToolbarPos] = useState<ToolbarPos | null>(null);
   const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
   const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [undoStack, setUndoStack] = useState<string[]>([]);
   const { contents, setContents } = useAppStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -113,6 +114,7 @@ export default function ContentCard({ item }: ContentCardProps) {
     const selectedText = editContent.substring(selectedRange.start, selectedRange.end);
     if (!selectedText.trim()) return;
 
+    setUndoStack(prev => [...prev, editContent]);
     setAiLoading(action);
     let result = '';
 
@@ -143,6 +145,7 @@ export default function ContentCard({ item }: ContentCardProps) {
     const textToPolish = editing ? editContent : item.content;
     if (!textToPolish.trim()) return;
 
+    setUndoStack(prev => [...prev, editing ? editContent : item.content]);
     setAiLoading('polish');
     if (!editing) {
       setEditing(true);
@@ -166,6 +169,14 @@ export default function ContentCard({ item }: ContentCardProps) {
         setAiLoading(null);
       },
     });
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack(s => s.slice(0, -1));
+    setEditContent(prev);
+    toast.success('已撤销');
   };
 
   const handleSave = () => {
@@ -294,7 +305,13 @@ export default function ContentCard({ item }: ContentCardProps) {
               {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
               {aiLoading === 'polish' ? '润色中...' : '一键润色'}
             </button>
-            <button onClick={() => { setEditing(false); setToolbarPos(null); }} className="content-card-btn">
+            {undoStack.length > 0 && (
+              <button onClick={handleUndo} disabled={!!aiLoading} className="content-card-btn text-[#999]">
+                <Undo2 size={13} />
+                撤销
+              </button>
+            )}
+            <button onClick={() => { setEditing(false); setToolbarPos(null); setUndoStack([]); }} className="content-card-btn">
               取消
             </button>
           </>
