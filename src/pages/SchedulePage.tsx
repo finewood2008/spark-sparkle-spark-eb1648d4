@@ -308,8 +308,11 @@ function ScheduleTimeline({ config }: { config: ScheduleConfig }) {
             ? config.topics[topicIdx % config.topics.length]
             : '待定主题';
           topicIdx++;
+          const times = config.scheduledTimes || ['09:00'];
+          const timeStr = times[i % times.length] || '09:00';
+          const [h, m] = timeStr.split(':').map(Number);
           const postDate = new Date(date);
-          postDate.setHours(9 + i * 3, 0, 0, 0);
+          postDate.setHours(h, m, 0, 0);
           dates.push({ date: postDate, platform, topic });
         }
       }
