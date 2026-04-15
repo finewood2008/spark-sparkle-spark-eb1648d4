@@ -229,14 +229,6 @@ export default function ContentEditDialog({ item: itemProp, open, onClose }: Con
     e.target.value = '';
   };
 
-  const handleSelect = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const s = ta.selectionStart, e = ta.selectionEnd;
-    if (s === e) { setSelRange(null); setSelectedText(''); return; }
-    setSelRange({ start: s, end: e });
-    setSelectedText(editContent.substring(s, e));
-  }, [editContent]);
 
   const addTag = () => {
     const t = tagInput.trim();
