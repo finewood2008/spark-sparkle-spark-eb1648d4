@@ -305,7 +305,13 @@ export default function ContentCard({ item }: ContentCardProps) {
               {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
               {aiLoading === 'polish' ? '润色中...' : '一键润色'}
             </button>
-            <button onClick={() => { setEditing(false); setToolbarPos(null); }} className="content-card-btn">
+            {undoStack.length > 0 && (
+              <button onClick={handleUndo} disabled={!!aiLoading} className="content-card-btn text-[#999]">
+                <Undo2 size={13} />
+                撤销
+              </button>
+            )}
+            <button onClick={() => { setEditing(false); setToolbarPos(null); setUndoStack([]); }} className="content-card-btn">
               取消
             </button>
           </>
