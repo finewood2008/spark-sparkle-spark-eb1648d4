@@ -13,6 +13,12 @@ export interface OptionCard {
   selected?: boolean;
 }
 
+export interface ChoiceOption {
+  id: string;
+  label: string;
+  emoji?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -21,6 +27,7 @@ export interface ChatMessage {
   suggestions?: string[];
   actions?: QuickAction[];
   options?: OptionCard[];
+  choices?: ChoiceOption[];
   image?: string;
   contentItem?: ContentItem;
   reportData?: Record<string, unknown>;

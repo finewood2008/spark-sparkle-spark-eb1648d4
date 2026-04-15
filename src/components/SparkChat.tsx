@@ -113,7 +113,11 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
   );
 }
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, onSend, onCardAction }: {
+  msg: ChatMessage;
+  onSend: (text: string) => void;
+  onCardAction: (action: string, item?: ContentItem) => void;
+}) {
   const isUser = msg.role === 'user';
 
   // Content card message
@@ -127,7 +131,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <ContentCard item={msg.contentItem} />
+          <ContentCard item={msg.contentItem} onAction={(action, item) => onCardAction(action, item)} />
         </div>
       </div>
     );
@@ -144,7 +148,10 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <DataReportCard data={msg.reportData as unknown as ReportData} />
+          <DataReportCard
+            data={msg.reportData as unknown as ReportData}
+            onAction={(action) => onCardAction(action)}
+          />
         </div>
       </div>
     );
@@ -163,8 +170,46 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   return (
     <div className="flex items-start gap-3">
       <SparkAvatar size={32} />
-      <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
-        <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+      <div className="flex-1 min-w-0 max-w-[80%]">
+        <div className="chat-bubble-assistant px-4 py-3">
+          <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+        </div>
+
+        {/* Choice pills */}
+        {msg.choices && msg.choices.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {msg.choices.map(c => (
+              <button
+                key={c.id}
+                onClick={() => onSend(c.label)}
+                className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
+              >
+                {c.emoji && <span className="mr-1">{c.emoji}</span>}
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Quick action buttons */}
+        {msg.actions && msg.actions.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {msg.actions.map(a => (
+              <button
+                key={a.value}
+                onClick={() => onSend(a.value)}
+                className={`px-3 py-1.5 rounded-lg text-[13px] transition-colors ${
+                  a.variant === 'primary'
+                    ? 'bg-spark-orange text-white hover:opacity-90'
+                    : 'bg-[#F5F5F3] text-[#666] hover:bg-[#EEEDEB]'
+                }`}
+              >
+                {a.icon && <span className="mr-1">{a.icon}</span>}
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -333,6 +378,16 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     });
   };
 
+  const handleCardAction = useCallback((action: string, item?: ContentItem) => {
+    const actionMap: Record<string, string> = {
+      restyle: `请帮我把「${item?.title || '这篇文章'}」换一种风格重新写`,
+      write_sequel: `请针对「${(item as any)?.title || '上篇内容'}」写一篇续集`,
+      analyze_trend: '请分析一下最近的内容数据趋势，给我一些建议',
+    };
+    const text = actionMap[action];
+    if (text) sendMessage(text);
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -348,7 +403,14 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
-            {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
+            {messages.map(msg => (
+              <MessageBubble
+                key={msg.id}
+                msg={msg}
+                onSend={sendMessage}
+                onCardAction={handleCardAction}
+              />
+            ))}
             {isGenerating && <TypingIndicator />}
           </div>
         </div>
