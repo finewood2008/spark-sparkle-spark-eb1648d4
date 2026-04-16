@@ -130,29 +130,16 @@ export default function ChatLayout() {
       <SparkProfile open={profileOpen} onOpenChange={setProfileOpen} />
 
       {/* Settings drawer */}
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div
-            className="flex-1 bg-black/30 backdrop-blur-sm"
-            onClick={() => setSettingsOpen(false)}
-          />
-          <div className="w-full max-w-md bg-[#FAFAF8] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#EEEDEB]">
-              <span className="text-sm font-semibold text-[#333]">系统设置</span>
-              <button
-                onClick={() => setSettingsOpen(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED]"
-                title="关闭"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <SettingsPage />
-            </div>
+      <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <SheetContent side="right" className="w-full max-w-md p-0 bg-[#FAFAF8] flex flex-col">
+          <SheetHeader className="px-4 py-3 border-b border-[#EEEDEB]">
+            <SheetTitle className="text-sm font-semibold text-[#333] text-left">系统设置</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <SettingsPage />
           </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
