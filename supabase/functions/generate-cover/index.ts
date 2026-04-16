@@ -38,57 +38,108 @@ serve(async (req) => {
     const snippet = (content || "").substring(0, 150).replace(/[#\n]/g, " ").trim();
     const prompt = `Generate a single photographic image in ${cfg.aspect} orientation. Topic: "${title}". Context: ${snippet}. Visual style: ${style || cfg.vibe}. CRITICAL: NO text, NO letters, NO words, NO watermarks, NO logos. Pure visual imagery only, like a real lifestyle photograph.`;
 
-    console.log("Calling Gemini image:", IMAGE_MODEL);
+    // 重试配置：最多 3 次（首次 + 2 次重试），针对可恢复错误
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAYS = [800, 2000]; // ms，指数退避
+    const isRetryable = (status: number) => status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 
-    const response = await fetch(GEN_URL(KEY), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
-      }),
-    });
+    let lastError: { status: number; body: string } | null = null;
 
-    if (response.status === 429) {
-      return new Response(JSON.stringify({ error: "请求过于频繁，请稍后再试" }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (response.status === 401 || response.status === 403) {
-      const t = await response.text();
-      console.error("Auth error:", t);
-      return new Response(JSON.stringify({ error: "Google API Key 无效或没有权限" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!response.ok) {
-      const t = await response.text();
-      console.error("Image API error:", response.status, t);
-      return new Response(JSON.stringify({ error: `图片生成暂不可用 (${response.status})` }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      console.log(`[generate-cover] attempt ${attempt}/${MAX_ATTEMPTS} - model: ${IMAGE_MODEL}`);
 
-    const result = await response.json();
-    const parts = result.candidates?.[0]?.content?.parts || [];
-    for (const p of parts) {
-      if (p.inlineData?.data) {
-        const mime = p.inlineData.mimeType || "image/png";
+      let response: Response;
+      try {
+        response = await fetch(GEN_URL(KEY), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+          }),
+        });
+      } catch (networkErr) {
+        console.error(`[generate-cover] network error on attempt ${attempt}:`, networkErr);
+        lastError = { status: 0, body: String(networkErr) };
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
+          continue;
+        }
+        break;
+      }
+
+      // 401/403：密钥问题，立刻失败不重试
+      if (response.status === 401 || response.status === 403) {
+        const t = await response.text();
+        console.error("[generate-cover] auth error:", t);
         return new Response(
-          JSON.stringify({ imageUrl: `data:${mime};base64,${p.inlineData.data}` }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "图片服务暂不可用，请稍后再试或联系管理员", code: "AUTH_FAILED" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      // 可重试错误（429/5xx）
+      if (!response.ok) {
+        const t = await response.text();
+        console.error(`[generate-cover] api error ${response.status} on attempt ${attempt}:`, t.substring(0, 300));
+        lastError = { status: response.status, body: t };
+        if (isRetryable(response.status) && attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
+          continue;
+        }
+        break;
+      }
+
+      // 成功：解析图片
+      const result = await response.json();
+      const parts = result.candidates?.[0]?.content?.parts || [];
+      for (const p of parts) {
+        if (p.inlineData?.data) {
+          const mime = p.inlineData.mimeType || "image/png";
+          if (attempt > 1) console.log(`[generate-cover] succeeded on attempt ${attempt}`);
+          return new Response(
+            JSON.stringify({ imageUrl: `data:${mime};base64,${p.inlineData.data}` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // 200 但没图（被安全策略拦截等），算作可重试
+      console.error(`[generate-cover] no image in response on attempt ${attempt}:`, JSON.stringify(result).substring(0, 500));
+      lastError = { status: 200, body: "no_image_returned" };
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
+        continue;
       }
     }
 
-    console.error("No image in response:", JSON.stringify(result).substring(0, 1000));
-    return new Response(JSON.stringify({ error: "图片生成失败，请重试" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    console.error("generate-cover error:", e);
+    // 所有重试都失败，返回友好错误
+    const status = lastError?.status ?? 500;
+    let userMessage = "封面生成失败，请稍后重试 🌧️";
+    let code = "UNKNOWN";
+
+    if (status === 429) {
+      userMessage = "AI 配图正忙，请喝口水稍后再试 ☕";
+      code = "RATE_LIMITED";
+    } else if (status === 0) {
+      userMessage = "网络连接不稳定，请检查后重试";
+      code = "NETWORK_ERROR";
+    } else if (status >= 500) {
+      userMessage = "图片服务暂时不可用，已重试多次仍失败，请稍后再试";
+      code = "UPSTREAM_ERROR";
+    } else if (status === 200) {
+      userMessage = "AI 这次没生成出图片，可换个标题或风格再试一次 ✨";
+      code = "NO_IMAGE";
+    }
+
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "未知错误" }),
+      JSON.stringify({ error: userMessage, code, attempts: MAX_ATTEMPTS }),
+      { status: status === 429 ? 429 : 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (e) {
+    console.error("[generate-cover] unexpected error:", e);
+    return new Response(
+      JSON.stringify({ error: "封面生成出了点小问题，请稍后重试", code: "INTERNAL" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
