@@ -58,11 +58,29 @@ const PLATFORM_LABEL: Record<string, string> = {
   instagram: 'Instagram',
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  manual: '手动创作',
-  schedule: '定时任务',
-  auto: '自动重写',
+const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
+  manual: {
+    text: '✍️ 手动创作',
+    cls: 'bg-muted text-muted-foreground border border-border',
+  },
+  schedule: {
+    text: '⏰ 定时任务',
+    cls: 'bg-blue-100 text-blue-700 border border-blue-200',
+  },
+  auto: {
+    text: '↻ 自动重写',
+    cls: 'bg-purple-100 text-purple-700 border border-purple-200',
+  },
 };
+
+function sourceTag(taskSource: string) {
+  return (
+    SOURCE_LABEL[taskSource] || {
+      text: taskSource,
+      cls: 'bg-muted text-muted-foreground border border-border',
+    }
+  );
+}
 
 function statusDot(status: ContentStatus) {
   switch (status) {
@@ -379,9 +397,14 @@ export default function ReviewCenter({ layout = 'page', refreshKey = 0 }: Review
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                             {PLATFORM_LABEL[e.platform] || e.platform}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                            {SOURCE_LABEL[e.taskSource] || e.taskSource}
-                          </span>
+                          {(() => {
+                            const s = sourceTag(e.taskSource);
+                            return (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.cls}`}>
+                                {s.text}
+                              </span>
+                            );
+                          })()}
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border ${badge.cls}`}>
                             {badge.text}
                           </span>
@@ -509,9 +532,10 @@ function DetailView({
           <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
             {PLATFORM_LABEL[entry.platform] || entry.platform}
           </span>
-          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-            {SOURCE_LABEL[entry.taskSource] || entry.taskSource}
-          </span>
+          {(() => {
+            const s = sourceTag(entry.taskSource);
+            return <span className={`text-xs px-2 py-0.5 rounded ${s.cls}`}>{s.text}</span>;
+          })()}
           <span className={`text-xs px-2 py-0.5 rounded border ${badge.cls}`}>{badge.text}</span>
           <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto">
             <Clock size={12} />
