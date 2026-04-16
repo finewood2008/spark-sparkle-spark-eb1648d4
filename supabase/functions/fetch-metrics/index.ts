@@ -118,19 +118,36 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   try {
+    let force = false;
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        force = !!body.force;
+      } catch {
+        // no body, ignore
+      }
+    }
+
     // Find published items where 24h has elapsed and we haven't fetched metrics yet
     // (or last fetch was more than 6h ago, for periodic refresh).
-    const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // If force=true, bypass the 24h cutoff (for manual testing).
+    const cutoff24h = force
+      ? new Date().toISOString() // any published item qualifies
+      : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const cutoff6h = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
 
-    const { data: items, error: queryErr } = await supabase
+    let q = supabase
       .from("review_items")
       .select("id, title, platform, published_platforms, published_at, metrics_fetched_at, user_id, device_id")
       .eq("status", "published")
       .not("published_at", "is", null)
-      .lte("published_at", cutoff24h)
-      .or(`metrics_fetched_at.is.null,metrics_fetched_at.lte.${cutoff6h}`)
-      .limit(50);
+      .lte("published_at", cutoff24h);
+
+    if (!force) {
+      q = q.or(`metrics_fetched_at.is.null,metrics_fetched_at.lte.${cutoff6h}`);
+    }
+
+    const { data: items, error: queryErr } = await q.limit(50);
 
     if (queryErr) throw queryErr;
 
