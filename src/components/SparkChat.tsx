@@ -106,8 +106,14 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
           {suggestions.map(s => (
             <button
               key={s}
-              onClick={() => onSuggestion(s)}
-              className="px-4 py-2 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[WelcomeState] suggestion clicked:', s);
+                onSuggestion(s);
+              }}
+              className="px-4 py-2 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors cursor-pointer relative z-10"
             >
               {s}
             </button>
