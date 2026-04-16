@@ -2,6 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/appStore';
 import { generateArticle } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
+import {
+  loadScheduleConfig,
+  saveScheduleConfig,
+  loadScheduleLogs,
+  insertScheduleLog,
+  updateScheduleLog,
+  clearScheduleLogs,
+  subscribeScheduleChanges,
+  type ScheduleLogEntry,
+} from '../lib/schedule-persistence';
 import type { ScheduleConfig, Platform, ContentItem } from '../types/spark';
 import {
   Calendar,
@@ -18,10 +28,9 @@ import {
   CalendarDays,
   Repeat,
   Target,
+  Cloud,
+  Trash2,
 } from 'lucide-react';
-
-const STORAGE_KEY = 'spark-auto-schedule';
-const SCHEDULE_LOG_KEY = 'spark-auto-schedule-log';
 
 const PLATFORM_LABELS: Record<Platform, string> = {
   xiaohongshu: '小红书',
@@ -33,47 +42,28 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-interface ScheduleLogEntry {
-  id: string;
-  topic: string;
-  platform: Platform;
-  status: 'success' | 'error' | 'pending';
-  contentId?: string;
-  error?: string;
-  timestamp: string;
-}
+const DEFAULT_CONFIG: ScheduleConfig = {
+  enabled: false,
+  frequency: 'daily',
+  daysOfWeek: [1, 3, 5],
+  platforms: ['xiaohongshu'],
+  topics: [],
+  style: '',
+  postsPerDay: 1,
+  scheduledTimes: ['09:00'],
+};
 
-function loadSchedule(): ScheduleConfig {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return {
-    enabled: false,
-    frequency: 'daily',
-    daysOfWeek: [1, 3, 5],
-    platforms: ['xiaohongshu'],
-    topics: [],
-    style: '',
-    postsPerDay: 1,
-    scheduledTimes: ['09:00'],
-  };
-}
-
-function saveSchedule(config: ScheduleConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-}
-
-function loadLogs(): ScheduleLogEntry[] {
-  try {
-    const stored = localStorage.getItem(SCHEDULE_LOG_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return [];
-}
-
-function saveLogs(logs: ScheduleLogEntry[]) {
-  localStorage.setItem(SCHEDULE_LOG_KEY, JSON.stringify(logs.slice(0, 50)));
+// Skip the very first save effect to avoid overwriting cloud config with defaults during initial load
+function useSkipFirst<T>(value: T, fn: (v: T) => void) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    fn(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 }
 
 // --- Schedule Config Form ---
@@ -361,33 +351,67 @@ function ScheduleTimeline({ config }: { config: ScheduleConfig }) {
 }
 
 // --- Execution Log ---
-function ExecutionLog({ logs }: { logs: ScheduleLogEntry[] }) {
-  if (logs.length === 0) {
-    return (
-      <div className="text-center py-6 text-spark-gray-400 text-xs">
-        暂无执行记录
-      </div>
-    );
-  }
+function ExecutionLog({ logs, onClear }: { logs: ScheduleLogEntry[]; onClear: () => void }) {
+  const [filter, setFilter] = useState<'all' | 'success' | 'error'>('all');
+  const filtered = logs.filter(l => filter === 'all' || l.status === filter);
 
   return (
-    <div className="space-y-2">
-      {logs.map(log => (
-        <div key={log.id} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-spark-gray-100">
-          {log.status === 'success' && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
-          {log.status === 'error' && <AlertCircle size={14} className="text-destructive shrink-0" />}
-          {log.status === 'pending' && <Loader2 size={14} className="text-spark-orange shrink-0 animate-spin" />}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-spark-gray-700 truncate">
-              {log.topic} · {PLATFORM_LABELS[log.platform] || log.platform}
-            </div>
-            {log.error && <div className="text-[10px] text-destructive mt-0.5">{log.error}</div>}
-          </div>
-          <div className="text-[10px] text-spark-gray-400 shrink-0">
-            {new Date(log.timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </div>
+    <div>
+      {/* Filter + Clear */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex gap-1 bg-spark-gray-100 rounded-md p-0.5">
+          {([
+            { id: 'all' as const, label: `全部 (${logs.length})` },
+            { id: 'success' as const, label: `成功 (${logs.filter(l => l.status === 'success').length})` },
+            { id: 'error' as const, label: `失败 (${logs.filter(l => l.status === 'error').length})` },
+          ]).map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setFilter(opt.id)}
+              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                filter === opt.id ? 'bg-spark-surface text-spark-orange shadow-sm' : 'text-spark-gray-500'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-      ))}
+        {logs.length > 0 && (
+          <button
+            onClick={() => {
+              if (confirm('确定清空所有执行记录？此操作不可恢复')) onClear();
+            }}
+            className="flex items-center gap-1 text-[11px] text-spark-gray-400 hover:text-destructive transition-colors"
+          >
+            <Trash2 size={11} /> 清空
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-6 text-spark-gray-400 text-xs">
+          {logs.length === 0 ? '暂无执行记录' : '当前筛选条件下无记录'}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(log => (
+            <div key={log.id} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-spark-gray-100">
+              {log.status === 'success' && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
+              {log.status === 'error' && <AlertCircle size={14} className="text-destructive shrink-0" />}
+              {log.status === 'pending' && <Loader2 size={14} className="text-spark-orange shrink-0 animate-spin" />}
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-spark-gray-700 truncate">
+                  {log.topic} · {PLATFORM_LABELS[log.platform] || log.platform}
+                </div>
+                {log.error && <div className="text-[10px] text-destructive mt-0.5">{log.error}</div>}
+              </div>
+              <div className="text-[10px] text-spark-gray-400 shrink-0">
+                {new Date(log.timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -395,14 +419,39 @@ function ExecutionLog({ logs }: { logs: ScheduleLogEntry[] }) {
 // --- Main Page ---
 export default function SchedulePage() {
   const { contents, setContents, setSelectedContentId, brand, addMessage } = useAppStore();
-  const [config, setConfig] = useState<ScheduleConfig>(loadSchedule);
-  const [logs, setLogs] = useState<ScheduleLogEntry[]>(loadLogs);
+  const [config, setConfig] = useState<ScheduleConfig>(DEFAULT_CONFIG);
+  const [logs, setLogs] = useState<ScheduleLogEntry[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [activeSection, setActiveSection] = useState<'config' | 'timeline' | 'log'>('config');
 
+  // Initial load from Supabase + realtime subscription
   useEffect(() => {
-    saveSchedule(config);
-  }, [config]);
+    let mounted = true;
+    (async () => {
+      const [cfg, lgs] = await Promise.all([loadScheduleConfig(), loadScheduleLogs()]);
+      if (!mounted) return;
+      setConfig(cfg);
+      setLogs(lgs);
+      setLoaded(true);
+    })();
+    const unsubscribe = subscribeScheduleChanges(
+      (cfg) => setConfig(cfg),
+      async () => {
+        const lgs = await loadScheduleLogs();
+        setLogs(lgs);
+      },
+    );
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Persist config changes (skip until first cloud load completes)
+  useSkipFirst(config, (cfg) => {
+    if (loaded) saveScheduleConfig(cfg);
+  });
 
   const toggleEnabled = () => {
     setConfig(prev => ({ ...prev, enabled: !prev.enabled }));
@@ -440,6 +489,10 @@ export default function SchedulePage() {
     }
 
     setLogs(prev => [...newLogs, ...prev]);
+    // Insert pending log rows to cloud
+    for (const l of newLogs) {
+      insertScheduleLog(l);
+    }
 
     for (let i = 0; i < newLogs.length; i++) {
       const log = newLogs[i];
@@ -491,6 +544,8 @@ export default function SchedulePage() {
       }
 
       setLogs(prev => prev.map(l => l.id === log.id ? { ...log } : l));
+      // Sync log status to cloud
+      updateScheduleLog(log);
     }
 
     // Add generated contents to store
@@ -499,7 +554,6 @@ export default function SchedulePage() {
       setSelectedContentId(newContents[0].id);
     }
 
-    saveLogs([...newLogs.map(l => ({ ...l })), ...loadLogs()]);
     setGenerating(false);
   }, [generating, config, getBrandContext, contents, setContents, setSelectedContentId, addMessage]);
 
@@ -543,7 +597,12 @@ export default function SchedulePage() {
             <Calendar size={20} className="text-spark-orange" />
             自动发布计划
           </h1>
-          <p className="text-sm text-spark-gray-400">设定规则，AI 自动生成并排期内容</p>
+          <p className="text-sm text-spark-gray-400 flex items-center gap-2">
+            设定规则，AI 自动生成并排期内容
+            <span className="inline-flex items-center gap-1 text-[10px] text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">
+              <Cloud size={10} /> 多端同步{loaded ? '已就绪' : '加载中…'}
+            </span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Run Once */}
@@ -616,7 +675,13 @@ export default function SchedulePage() {
           <ScheduleTimeline config={config} />
         )}
         {activeSection === 'log' && (
-          <ExecutionLog logs={logs} />
+          <ExecutionLog
+            logs={logs}
+            onClear={async () => {
+              await clearScheduleLogs();
+              setLogs([]);
+            }}
+          />
         )}
       </div>
     </div>
