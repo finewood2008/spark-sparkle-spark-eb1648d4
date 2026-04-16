@@ -505,6 +505,79 @@ function AuthPage() {
           <span className="text-spark-orange cursor-pointer hover:underline">隐私政策</span>
         </p>
       </div>
+
+      {/* 忘记密码弹窗 */}
+      {forgotOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => !forgotLoading && setForgotOpen(false)}
+        >
+          <div
+            className="w-[92vw] max-w-[400px] rounded-2xl bg-card border border-border shadow-xl p-6 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {forgotSent ? (
+              <div className="text-center py-2">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mail size={20} className="text-primary" />
+                </div>
+                <h3 className="text-base font-semibold text-foreground mb-1">重置邮件已发送</h3>
+                <p className="text-xs text-muted-foreground mb-1">
+                  请检查 <span className="text-foreground font-medium">{forgotEmail}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mb-5">
+                  点击邮件中的链接即可设置新密码（有效期 1 小时）
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setForgotOpen(false)}
+                  className="spark-btn-primary w-full h-10"
+                >
+                  我知道了
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-base font-semibold text-foreground mb-1">重置密码</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  输入注册邮箱，我们会发送一封含重置链接的邮件给你
+                </p>
+                <div className="relative mb-4">
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    className="spark-input pl-9"
+                    type="email"
+                    placeholder="邮箱"
+                    autoFocus
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !forgotLoading && handleForgotPassword()}
+                    disabled={forgotLoading}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForgotOpen(false)}
+                    disabled={forgotLoading}
+                    className="flex-1 h-10 rounded-lg border border-border text-sm text-foreground hover:bg-muted transition disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={forgotLoading}
+                    className="spark-btn-primary flex-1 h-10"
+                  >
+                    {forgotLoading ? <Loader2 size={16} className="animate-spin" /> : '发送重置邮件'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
