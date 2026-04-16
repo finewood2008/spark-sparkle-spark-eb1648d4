@@ -72,13 +72,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, mode, platform, brandContext } = await req.json();
+    const { messages, mode, platform, brandContext, presetId } = await req.json();
     const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const systemPrompt = mode === "generate"
-      ? buildGeneratePrompt(platform, brandContext)
-      : buildChatPrompt(brandContext);
+      ? buildGeneratePrompt(platform, brandContext, presetId)
+      : buildChatPrompt(brandContext, presetId);
 
     const body = toGemini(messages, systemPrompt);
 
