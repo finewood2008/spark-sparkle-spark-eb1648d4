@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Loader2, CheckCircle2, BarChart3, Rocket, Check } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { loadUserPrefs } from '../lib/user-prefs';
+import { supabase } from '@/integrations/supabase/client';
 import type { Platform, DistributionData } from '../types/spark';
 import type { ReportData } from './DataReportCard';
 import { toast } from 'sonner';
@@ -55,14 +56,30 @@ export default function DistributionCard({ data }: DistributionCardProps) {
     // Simulate platform API calls (1.2s)
     await new Promise(resolve => setTimeout(resolve, 1200));
 
+    const publishedAt = new Date().toISOString();
+
     // Update content status to published
     if (item) {
       const updated = contents.map(c =>
         c.id === item.id
-          ? { ...c, status: 'published' as const, publishedAt: new Date().toISOString() }
+          ? { ...c, status: 'published' as const, publishedAt }
           : c
       );
       setContents(updated);
+    }
+
+    // Persist to Supabase so the cron job can pick it up in 24h
+    try {
+      await supabase
+        .from('review_items')
+        .update({
+          status: 'published',
+          published_at: publishedAt,
+          published_platforms: selected,
+        })
+        .eq('id', data.contentId);
+    } catch (err) {
+      console.error('[distribution] failed to persist published_at:', err);
     }
 
     setPublishedTo(selected);
@@ -75,7 +92,7 @@ export default function DistributionCard({ data }: DistributionCardProps) {
     addMessage({
       id: `${Date.now()}-published`,
       role: 'assistant',
-      content: `🎉 「${data.title}」已成功发布至 ${platformLabels}！数据每小时刷新一次，明天早上我会汇总一份数据简报给你。`,
+      content: `🎉 「${data.title}」已成功发布至 ${platformLabels}！我会在 24 小时后自动拉取各平台的真实互动数据并推送给你 📊`,
       timestamp: new Date().toISOString(),
     });
     toast.success(`已发布至 ${selected.length} 个平台`);
