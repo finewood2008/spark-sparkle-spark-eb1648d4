@@ -233,6 +233,8 @@ export function subscribeScheduleChanges(
     )
     .subscribe();
   return () => {
+    supabase.removeChannel(channel);
+  };
 }
 
 /* ===================== TASK EXECUTION ===================== */
