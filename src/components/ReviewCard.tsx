@@ -74,6 +74,22 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
     toast.success('内容已通过审核');
   };
 
+  const handleIgnore = async () => {
+    // Remove from chat: filter out any message that references this content item
+    const filteredMessages = messages.filter(
+      (m) => m.contentItem?.id !== item.id,
+    );
+    // Remove from contents store
+    const filteredContents = contents.filter((c) => c.id !== item.id);
+    useAppStore.setState({
+      messages: filteredMessages,
+      contents: filteredContents,
+    });
+    // Delete from database
+    await deleteReviewItem(item.id);
+    toast.success('已忽略此审核任务');
+  };
+
   const runRegenerate = async (reason: string, presetLabel?: string) => {
     if (!reason.trim()) {
       toast.error('请填写打回意见');
