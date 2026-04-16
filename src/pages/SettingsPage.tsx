@@ -164,6 +164,38 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* 定时任务测试 */}
+      <div className="spark-card p-5 mb-4">
+        <h2 className="font-semibold text-sm text-spark-gray-700 mb-1 flex items-center gap-2">
+          <Play size={16} className="text-spark-orange" />
+          定时任务测试
+        </h2>
+        <p className="text-xs text-spark-gray-500 mb-4">
+          立即模拟一次定时任务执行：从你的计划里随机挑一个主题生成内容，并送进审核中心。无需等待 cron。
+        </p>
+        <button
+          type="button"
+          onClick={handleRunOnce}
+          disabled={running}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-spark-orange text-white text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+        >
+          {running ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              生成中，请稍候...
+            </>
+          ) : (
+            <>
+              <Play size={16} />
+              立即执行一次
+            </>
+          )}
+        </button>
+        <p className="text-[11px] text-spark-gray-400 mt-3 leading-relaxed">
+          💡 提示：如果还没在「定时计划」里配置主题，将使用默认主题「今日灵感分享」+ 小红书。
+        </p>
+      </div>
+
       <div className="spark-card p-5 text-xs text-spark-gray-500 leading-relaxed">
         如需更换密钥或额度告罄，请联系管理员在后端密钥管理中更新{' '}
         <code className="px-1 py-0.5 rounded bg-spark-gray-100 text-spark-gray-700">
