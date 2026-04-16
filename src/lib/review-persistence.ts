@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
-import type { ContentItem, ReviewTaskData, ChatMessage } from '@/types/spark';
+import type { ContentItem, ReviewTaskData, ChatMessage, MetricsCardData } from '@/types/spark';
 
 const DEVICE_ID = 'default';
 
