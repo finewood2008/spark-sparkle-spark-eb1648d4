@@ -86,6 +86,7 @@ export function useMemorySync() {
     loaded.current = true;
     loadData();
     loadReviewItemsIntoStore();
+    loadMetricsIntoStore();
   }, [loadData]);
 
   // Reload when user changes (login/logout)
@@ -100,9 +101,27 @@ export function useMemorySync() {
     currentUserId.current = userId;
     loadData();
     loadReviewItemsIntoStore();
+    loadMetricsIntoStore();
     // Also sync user preferences from cloud
     syncPrefsFromCloud();
   }, [isAuthenticated, user?.id, loadData]);
+
+  // Subscribe to realtime new metrics so 24h cron pushes show up live
+  useEffect(() => {
+    const channel = supabase
+      .channel('content_metrics_changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'content_metrics', filter: 'platform=eq.all' },
+        () => {
+          loadMetricsIntoStore();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Save brand when it changes
   const saveBrand = useCallback(async (b: BrandMemory) => {
