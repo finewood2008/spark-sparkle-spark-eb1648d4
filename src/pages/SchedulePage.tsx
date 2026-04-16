@@ -675,7 +675,13 @@ export default function SchedulePage() {
           <ScheduleTimeline config={config} />
         )}
         {activeSection === 'log' && (
-          <ExecutionLog logs={logs} />
+          <ExecutionLog
+            logs={logs}
+            onClear={async () => {
+              await clearScheduleLogs();
+              setLogs([]);
+            }}
+          />
         )}
       </div>
     </div>
