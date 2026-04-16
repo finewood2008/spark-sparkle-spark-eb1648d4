@@ -30,9 +30,6 @@ import {
   Target,
 } from 'lucide-react';
 
-const STORAGE_KEY = 'spark-auto-schedule';
-const SCHEDULE_LOG_KEY = 'spark-auto-schedule-log';
-
 const PLATFORM_LABELS: Record<Platform, string> = {
   xiaohongshu: '小红书',
   wechat: '公众号',
@@ -43,48 +40,16 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-interface ScheduleLogEntry {
-  id: string;
-  topic: string;
-  platform: Platform;
-  status: 'success' | 'error' | 'pending';
-  contentId?: string;
-  error?: string;
-  timestamp: string;
-}
-
-function loadSchedule(): ScheduleConfig {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return {
-    enabled: false,
-    frequency: 'daily',
-    daysOfWeek: [1, 3, 5],
-    platforms: ['xiaohongshu'],
-    topics: [],
-    style: '',
-    postsPerDay: 1,
-    scheduledTimes: ['09:00'],
-  };
-}
-
-function saveSchedule(config: ScheduleConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-}
-
-function loadLogs(): ScheduleLogEntry[] {
-  try {
-    const stored = localStorage.getItem(SCHEDULE_LOG_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return [];
-}
-
-function saveLogs(logs: ScheduleLogEntry[]) {
-  localStorage.setItem(SCHEDULE_LOG_KEY, JSON.stringify(logs.slice(0, 50)));
-}
+const DEFAULT_CONFIG: ScheduleConfig = {
+  enabled: false,
+  frequency: 'daily',
+  daysOfWeek: [1, 3, 5],
+  platforms: ['xiaohongshu'],
+  topics: [],
+  style: '',
+  postsPerDay: 1,
+  scheduledTimes: ['09:00'],
+};
 
 // --- Schedule Config Form ---
 function ScheduleConfigForm({
