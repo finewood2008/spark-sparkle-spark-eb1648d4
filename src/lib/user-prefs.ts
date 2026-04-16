@@ -3,6 +3,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
+export type TonePresetId = 'professional' | 'lively' | 'minimal';
+
 export interface UserPreferences {
   defaultPlatform: 'xiaohongshu' | 'wechat' | 'douyin';
   writingStyle: string;
@@ -11,6 +13,8 @@ export interface UserPreferences {
   defaultLength: 'short' | 'medium' | 'long';
   autoCta: boolean;
   coverStyle: string;
+  /** 火花的语气预设：专业 / 活泼 / 极简 */
+  tonePreset: TonePresetId;
 }
 
 export const defaultPrefs: UserPreferences = {
@@ -21,6 +25,7 @@ export const defaultPrefs: UserPreferences = {
   defaultLength: 'medium',
   autoCta: true,
   coverStyle: '简约清新',
+  tonePreset: 'lively',
 };
 
 const STORAGE_KEY = 'spark-user-prefs';
