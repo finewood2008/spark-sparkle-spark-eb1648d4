@@ -51,6 +51,19 @@ const DEFAULT_CONFIG: ScheduleConfig = {
   scheduledTimes: ['09:00'],
 };
 
+// Skip the very first save effect to avoid overwriting cloud config with defaults during initial load
+function useSkipFirst<T>(value: T, fn: (v: T) => void) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    fn(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+}
+
 // --- Schedule Config Form ---
 function ScheduleConfigForm({
   config,
