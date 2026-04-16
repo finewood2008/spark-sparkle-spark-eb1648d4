@@ -38,6 +38,7 @@ const PRESETS: PresetOption[] = [
 
 export default function SettingsPage() {
   const [preset, setPreset] = useState<TonePresetId>('lively');
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     setPreset(loadUserPrefs().tonePreset);
@@ -49,6 +50,37 @@ export default function SettingsPage() {
     await saveUserPrefs({ ...prefs, tonePreset: id });
     const label = PRESETS.find((p) => p.id === id)?.label;
     toast.success(`火花切换到「${label}」语气`);
+  };
+
+  const handleRunOnce = async () => {
+    setRunning(true);
+    try {
+      const cfg = await loadScheduleConfig();
+      const topics = cfg.topics?.length ? cfg.topics : ['今日灵感分享'];
+      const platforms = cfg.platforms?.length ? cfg.platforms : (['xiaohongshu'] as const);
+      const topic = topics[Math.floor(Math.random() * topics.length)];
+      const platform = platforms[Math.floor(Math.random() * platforms.length)];
+
+      toast.info(`正在生成「${topic}」...`);
+      const result = await executeScheduledTask({
+        topic,
+        platform,
+        style: cfg.style,
+        taskName: '手动触发测试',
+      });
+
+      if (result.success) {
+        toast.success('✅ 已生成 1 篇内容并送入审核中心', {
+          description: '点击右上角审核按钮查看',
+        });
+      } else {
+        toast.error(`生成失败：${result.error || '未知错误'}`);
+      }
+    } catch (e) {
+      toast.error(`执行出错：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (
