@@ -38,6 +38,7 @@ export default function DistributionCard({ data }: DistributionCardProps) {
   const [selected, setSelected] = useState<Platform[]>(initialDefaults);
   const [publishing, setPublishing] = useState(false);
   const [publishedTo, setPublishedTo] = useState<Platform[]>(data.publishedPlatforms || []);
+  const [fetchingTest, setFetchingTest] = useState(false);
 
   const isSuccess = publishedTo.length > 0;
 
@@ -96,6 +97,27 @@ export default function DistributionCard({ data }: DistributionCardProps) {
       timestamp: new Date().toISOString(),
     });
     toast.success(`已发布至 ${selected.length} 个平台`);
+  };
+
+  const handleTestFetchNow = async () => {
+    setFetchingTest(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('fetch-metrics', {
+        body: { force: true, contentId: data.contentId },
+      });
+      if (error) throw error;
+      const processed = (result as { processed?: number })?.processed ?? 0;
+      if (processed > 0) {
+        toast.success(`✨ 已拉取 ${processed} 条内容数据，请稍候查看对话流`);
+      } else {
+        toast.info('暂无可拉取的已发布内容');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '拉取失败';
+      toast.error(`拉取失败：${msg}`);
+    } finally {
+      setFetchingTest(false);
+    }
   };
 
   const handleViewData = () => {
