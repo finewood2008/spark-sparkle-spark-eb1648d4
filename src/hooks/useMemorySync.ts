@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { getUserPrefsContext, syncPrefsFromCloud } from '@/lib/user-prefs';
-import { loadReviewItemsIntoStore } from '@/lib/review-persistence';
+import { loadReviewItemsIntoStore, loadMetricsIntoStore } from '@/lib/review-persistence';
 import type { BrandMemory, LearningEntry } from '@/types/spark';
 
 const DEVICE_ID = 'default';
