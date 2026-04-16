@@ -77,7 +77,7 @@ ${fullContent}
 
         const learnResp = await fetch(GEMINI_URL, {
           method: "POST",
-          headers: { Authorization: `Bearer ${GOOGLE_GEMINI_API_KEY}`, "Content-Type": "application/json" },
+          headers: { "x-goog-api-key": GOOGLE_GEMINI_API_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: GEMINI_MODEL,
             messages: [{ role: "user", content: learnPrompt }],
@@ -104,7 +104,7 @@ ${fullContent}
     const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GOOGLE_GEMINI_API_KEY}`,
+        "x-goog-api-key": GOOGLE_GEMINI_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
