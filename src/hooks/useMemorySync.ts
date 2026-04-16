@@ -172,16 +172,25 @@ export function useMemorySync() {
     }
   }, []);
 
-  // Save learnings when they change
+  // Save learnings when they change (incremental upsert)
+  const prevLearningsRef = useRef<LearningEntry[]>([]);
   const saveLearnings = useCallback(async (entries: LearningEntry[]) => {
     if (savingLearnings.current) return;
     savingLearnings.current = true;
     try {
       const id = getIdentifier();
-      // Delete all existing for this user/device
-      await supabase.from('learning_entries').delete().eq(id.column, id.value);
+      const prevIds = new Set(prevLearningsRef.current.map(e => e.id));
+      const currentIds = new Set(entries.map(e => e.id));
+
+      // Delete removed entries
+      const removedIds = [...prevIds].filter(id => !currentIds.has(id));
+      if (removedIds.length > 0) {
+        await supabase.from('learning_entries').delete().in('id', removedIds);
+      }
+
+      // Upsert current entries
       if (entries.length > 0) {
-        await supabase.from('learning_entries').insert(
+        await supabase.from('learning_entries').upsert(
           entries.map(e => ({
             id: e.id,
             device_id: DEVICE_ID,
@@ -192,9 +201,12 @@ export function useMemorySync() {
             evidence: e.evidence,
             confidence: e.confidence,
             created_at: e.timestamp,
-          }))
+          })),
+          { onConflict: 'id' },
         );
       }
+
+      prevLearningsRef.current = entries;
     } finally {
       savingLearnings.current = false;
     }

@@ -97,7 +97,7 @@ export async function saveScheduleConfig(config: ScheduleConfig): Promise<void> 
   const deviceId = getDeviceId();
   const payload = {
     device_id: deviceId,
-    kind: 'config',
+    kind: 'config' as const,
     enabled: config.enabled,
     frequency: config.frequency,
     days_of_week: config.daysOfWeek,
@@ -108,24 +108,10 @@ export async function saveScheduleConfig(config: ScheduleConfig): Promise<void> 
     scheduled_times: config.scheduledTimes || ['09:00'],
   };
 
-  // Upsert by (device_id, kind='config') — unique index ensures single row
-  const { data: existing } = await supabase
+  const { error } = await supabase
     .from('schedule_tasks')
-    .select('id')
-    .eq('device_id', deviceId)
-    .eq('kind', 'config')
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from('schedule_tasks')
-      .update(payload)
-      .eq('id', (existing as { id: string }).id);
-    if (error) console.warn('[schedule] update config failed', error);
-  } else {
-    const { error } = await supabase.from('schedule_tasks').insert(payload);
-    if (error) console.warn('[schedule] insert config failed', error);
-  }
+    .upsert(payload, { onConflict: 'device_id,kind' });
+  if (error) console.warn('[schedule] save config failed', error);
 }
 
 /* ===================== LOGS ===================== */
