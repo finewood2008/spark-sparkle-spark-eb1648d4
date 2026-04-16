@@ -4,7 +4,9 @@ import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData } from '../types/spark';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '../store/authStore';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData, Platform } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
 import ReviewReminderCard from './ReviewReminderCard';
@@ -51,25 +53,75 @@ function TypingIndicator() {
   );
 }
 
-// Mock data for welcome briefing
-const mockReport: ReportData = {
-  title: '5个让你皮肤发光的晨间习惯',
-  platform: 'xiaohongshu',
-  metrics: { views: 12800, likes: 986, comments: 234, saves: 567 },
-  sparkComment: '这篇笔记的互动率达到了 13.9%，远超行业平均水平。',
-  topComments: [
-    { user: '小美同学', text: '第三个方法真的有用！已经坚持一周了' },
-    { user: '护肤达人Lisa', text: '请问用的什么牌子的洁面？求推荐' },
-    { user: '早起打卡', text: '收藏了，明天开始试试看' },
-  ],
-  sparkAdvice: '收藏率远超平均值，说明干货密度很高。评论区都在问工具清单，建议针对工具做一期衍生内容。',
-};
-
 function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }) {
-  const suggestions = [
-    '好的，帮我写一篇护肤好物清单',
-    '换个方向，分析一下最近的爆款选题',
-  ];
+  const [report, setReport] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLatestReport = async () => {
+      const { user, isAuthenticated } = useAuthStore.getState();
+      // Find the most recent published item
+      let itemsQuery = supabase
+        .from('review_items')
+        .select('id, title, platform, published_platforms, published_at')
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .limit(1);
+      itemsQuery = isAuthenticated && user?.id
+        ? itemsQuery.eq('user_id', user.id)
+        : itemsQuery.is('user_id', null).eq('device_id', 'default');
+
+      const { data: items } = await itemsQuery;
+      if (cancelled) return;
+      const latest = items?.[0];
+      if (!latest) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch aggregated metrics for that item
+      const { data: metricsRows } = await supabase
+        .from('content_metrics')
+        .select('*')
+        .eq('review_item_id', latest.id)
+        .eq('platform', 'all')
+        .order('fetched_at', { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      const m = metricsRows?.[0];
+      if (!m) {
+        setLoading(false);
+        return;
+      }
+
+      setReport({
+        title: latest.title || '(无标题)',
+        platform: (latest.platform as Platform) || 'xiaohongshu',
+        metrics: {
+          views: m.views || 0,
+          likes: m.likes || 0,
+          comments: m.comments || 0,
+          saves: m.saves || 0,
+        },
+        sparkComment: '',
+        sparkAdvice: m.ai_insight || '',
+      });
+      setLoading(false);
+    };
+    loadLatestReport();
+    return () => { cancelled = true; };
+  }, []);
+
+  const suggestions = report
+    ? [
+        '帮我写一篇类似风格的新内容',
+        '分析一下这条内容为什么表现好',
+      ]
+    : [
+        '帮我写一篇小红书种草笔记',
+        '推荐几个最近热门的选题方向',
+      ];
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -79,28 +131,38 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
           <SparkAvatar size={32} />
           <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
             <p className="text-[14px] leading-[1.6] text-[#333]">
-              早上好 ☀️ 昨天发的内容表现还不错，我整理了一份简报给你看看。
+              {loading
+                ? '早上好 ☀️ 我正在拉取最近的发布数据……'
+                : report
+                  ? '早上好 ☀️ 这是你最近一条发布内容的真实数据回流：'
+                  : '早上好 ☀️ 我是火花，你的内容创作搭子。还没有发布过内容，告诉我你想做什么吧～'}
             </p>
           </div>
         </div>
 
-        {/* Data report card */}
-        <div className="flex items-start gap-3">
-          <SparkAvatar size={32} />
-          <div className="flex-1 min-w-0 max-w-[85%]">
-            <DataReportCard data={mockReport} />
+        {/* Real data report card (only if real data exists) */}
+        {report && (
+          <div className="flex items-start gap-3">
+            <SparkAvatar size={32} />
+            <div className="flex-1 min-w-0 max-w-[85%]">
+              <DataReportCard data={report} />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Spark suggestion */}
-        <div className="flex items-start gap-3">
-          <SparkAvatar size={32} />
-          <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
-            <p className="text-[14px] leading-[1.6] text-[#333]">
-              根据最近的数据趋势，我建议今天可以写一篇关于「晨间护肤好物推荐」的内容，趁着上篇笔记的热度做系列。要不要我来？
-            </p>
+        {!loading && (
+          <div className="flex items-start gap-3">
+            <SparkAvatar size={32} />
+            <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
+              <p className="text-[14px] leading-[1.6] text-[#333]">
+                {report
+                  ? '基于这条内容的表现，要不要我帮你顺势再写一篇？或者直接用下面的快捷指令开聊👇'
+                  : '我可以帮你写小红书 / 公众号 / 抖音脚本，做选题分析，还能定时自动生成内容。试试下面任意一个？'}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Quick suggestions */}
         <div className="flex flex-wrap gap-2 pl-11">
