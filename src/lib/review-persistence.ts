@@ -195,3 +195,79 @@ export async function loadReviewItemsIntoStore(): Promise<void> {
     });
   }
 }
+
+/**
+ * Load any content_metrics rows that don't yet have a chat message,
+ * and inject them as MetricsCard messages into the chat stream.
+ * Only loads the aggregated 'all' platform row per item to avoid spam.
+ */
+export async function loadMetricsIntoStore(): Promise<void> {
+  const id = getIdentifier();
+  const query = supabase
+    .from('content_metrics')
+    .select('*')
+    .eq('platform', 'all')
+    .order('fetched_at', { ascending: true });
+
+  const { data, error } = id.user_id
+    ? await query.eq('user_id', id.user_id)
+    : await query.is('user_id', null).eq('device_id', id.device_id);
+
+  if (error) {
+    console.error('[metrics] load failed:', error);
+    return;
+  }
+  if (!data || data.length === 0) return;
+
+  // Look up titles + published_platforms from review_items
+  const reviewIds = [...new Set(data.map(r => r.review_item_id))];
+  const { data: items } = await supabase
+    .from('review_items')
+    .select('id, title, published_platforms, platform')
+    .in('id', reviewIds);
+  const itemMap = new Map((items || []).map(i => [i.id, i]));
+
+  const store = useAppStore.getState();
+  const existingMsgIds = new Set(store.messages.map(m => m.id));
+  const newMessages: ChatMessage[] = [];
+
+  for (const row of data) {
+    const msgId = `metrics-${row.id}`;
+    if (existingMsgIds.has(msgId)) continue;
+    const item = itemMap.get(row.review_item_id);
+    if (!item) continue;
+
+    const card: MetricsCardData = {
+      reviewItemId: row.review_item_id,
+      title: item.title || '(无标题)',
+      platform: row.platform,
+      publishedPlatforms:
+        item.published_platforms?.length > 0 ? item.published_platforms : [item.platform],
+      fetchedAt: row.fetched_at,
+      metrics: {
+        views: row.views,
+        likes: row.likes,
+        comments: row.comments,
+        saves: row.saves,
+        shares: row.shares,
+      },
+      aiInsight: row.ai_insight || '',
+      source: (row.source as 'mock' | 'real') || 'mock',
+    };
+
+    newMessages.push({
+      id: msgId,
+      role: 'assistant',
+      content: `📊 你发布的「${item.title}」24 小时数据回流来啦：`,
+      timestamp: row.fetched_at,
+      metricsCard: card,
+    });
+  }
+
+  if (newMessages.length > 0) {
+    useAppStore.setState({
+      messages: [...useAppStore.getState().messages, ...newMessages],
+    });
+  }
+}
+
