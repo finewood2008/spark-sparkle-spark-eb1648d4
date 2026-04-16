@@ -124,6 +124,40 @@ function MessageBubble({ msg, onSend, onCardAction }: {
 }) {
   const isUser = msg.role === 'user';
 
+  // Distribution card — content approved, choose platforms to publish
+  if (!isUser && msg.distribution) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <DistributionCard data={msg.distribution} />
+        </div>
+      </div>
+    );
+  }
+
+  // Schedule card — natural-language triggered task creation
+  if (!isUser && msg.scheduleCard) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <ScheduleCard data={msg.scheduleCard} />
+        </div>
+      </div>
+    );
+  }
+
   // Review card (Human-in-the-loop) — for scheduled-task generated content awaiting approval
   if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
     return (
