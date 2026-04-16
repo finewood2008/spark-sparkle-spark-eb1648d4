@@ -40,6 +40,22 @@ export default function DistributionCard({ data }: DistributionCardProps) {
   const [publishing, setPublishing] = useState(false);
   const [publishedTo, setPublishedTo] = useState<Platform[]>(data.publishedPlatforms || []);
   const [fetchingTest, setFetchingTest] = useState(false);
+  const [previewPlatform, setPreviewPlatform] = useState<Platform | null>(initialDefaults[0] ?? null);
+
+  // Keep preview tab in sync with selection (auto-pick first selected if current is unselected)
+  useEffect(() => {
+    if (publishedTo.length > 0) {
+      if (!previewPlatform || !publishedTo.includes(previewPlatform)) {
+        setPreviewPlatform(publishedTo[0]);
+      }
+      return;
+    }
+    if (selected.length === 0) {
+      setPreviewPlatform(null);
+    } else if (!previewPlatform || !selected.includes(previewPlatform)) {
+      setPreviewPlatform(selected[0]);
+    }
+  }, [selected, publishedTo, previewPlatform]);
 
   const isSuccess = publishedTo.length > 0;
 
