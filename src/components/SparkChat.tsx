@@ -384,9 +384,59 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     };
   };
 
+  const submitForReview = useCallback(async () => {
+    // Find the most recent draft content item
+    const all = useAppStore.getState().contents;
+    const draft = all.find(c => c.status === 'draft');
+    if (!draft) {
+      addMessage({
+        id: `${Date.now()}-no-draft`,
+        role: 'assistant',
+        content: '咦，没有找到待提交的草稿哦～请先生成一篇内容再提交审核。',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    // Update status → reviewing
+    const updatedItem: ContentItem = { ...draft, status: 'reviewing', updatedAt: new Date().toISOString() };
+    setContents(all.map(c => (c.id === draft.id ? updatedItem : c)));
+
+    // Persist
+    const task: ReviewTaskData = {
+      source: 'manual',
+      taskName: '手动创作',
+      triggeredAt: new Date().toISOString(),
+    };
+    await saveReviewItem(updatedItem, task);
+
+    addMessage({
+      id: `${Date.now()}-submitted`,
+      role: 'assistant',
+      content: '✅ 已提交到审核中心，你可以随时去审核页查看和操作。',
+      timestamp: new Date().toISOString(),
+      reviewReminder: {
+        taskName: '手动创作',
+        message: '内容已进入审核中心，待你审核',
+        item: { id: updatedItem.id, title: updatedItem.title, content: updatedItem.content, status: 'reviewing' },
+      },
+    });
+  }, [addMessage, setContents]);
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isGenerating) return;
     setInput('');
+
+    // Special-case: "提交审核" choice — skip AI, submit current draft
+    if (text.trim() === '提交审核') {
+      addMessage({
+        id: Date.now().toString(),
+        role: 'user',
+        content: '提交审核',
+        timestamp: new Date().toISOString(),
+      });
+      await submitForReview();
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
