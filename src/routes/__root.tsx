@@ -1,4 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuthStore } from "@/store/authStore";
 
 import appCss from "../styles.css?url";
 
@@ -51,7 +54,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -66,5 +69,54 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const login = useAuthStore((s) => s.login);
+  const logout = useAuthStore((s) => s.logout);
+
+  useEffect(() => {
+    // Restore session on mount
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        const u = data.session.user;
+        login(
+          {
+            id: u.id,
+            username: u.email?.split("@")[0] || "user",
+            nickname:
+              (u.user_metadata?.nickname as string) ||
+              u.email?.split("@")[0] ||
+              "火花用户",
+            avatar: "",
+            email: u.email || undefined,
+          },
+          data.session.access_token,
+        );
+      }
+    });
+
+    // Listen for auth changes (login/logout from other tabs, token refresh)
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const u = session.user;
+        login(
+          {
+            id: u.id,
+            username: u.email?.split("@")[0] || "user",
+            nickname:
+              (u.user_metadata?.nickname as string) ||
+              u.email?.split("@")[0] ||
+              "火花用户",
+            avatar: "",
+            email: u.email || undefined,
+          },
+          session.access_token,
+        );
+      } else {
+        logout();
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, [login, logout]);
+
   return <Outlet />;
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { FileText, User, Brain, ClipboardCheck } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +13,7 @@ export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
+  const navigate = useNavigate();
 
   const { getFullContext } = useMemorySync();
 
@@ -57,7 +59,7 @@ export default function ChatLayout() {
             <FileText size={18} />
           </button>
           <button
-            onClick={() => { window.location.href = '/review'; }}
+            onClick={() => navigate({ to: '/review' })}
             className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
             title="审核中心"
           >
@@ -78,7 +80,7 @@ export default function ChatLayout() {
           <button
             onClick={() => {
               const { isAuthenticated } = useAuthStore.getState();
-              window.location.href = isAuthenticated ? '/account' : '/auth';
+              navigate({ to: isAuthenticated ? '/account' : '/auth' });
             }}
             className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
             title="个人中心"

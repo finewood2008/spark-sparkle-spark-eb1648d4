@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
 import {
@@ -21,6 +22,7 @@ const tabs: { id: TabId; icon: React.ReactNode; label: string }[] = [
 
 export default function SparkSidebar() {
   const { activeTab, setActiveTab } = useAppStore();
+  const navigate = useNavigate();
 
   return (
     <div className="w-[72px] h-screen bg-spark-surface border-r border-spark-gray-200 flex flex-col items-center py-4 shrink-0">
@@ -64,7 +66,7 @@ export default function SparkSidebar() {
         <button
           onClick={() => {
             const { isAuthenticated } = useAuthStore.getState();
-            window.location.href = isAuthenticated ? '/account' : '/auth';
+            navigate({ to: isAuthenticated ? '/account' : '/auth' });
           }}
           className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors text-spark-gray-400 hover:bg-spark-gray-100 hover:text-spark-gray-600"
         >
