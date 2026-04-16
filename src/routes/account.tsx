@@ -116,7 +116,8 @@ function AccountPage() {
     setLoadingProvider(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     logout();
     toast.success('已退出登录');
     navigate({ to: '/auth' });
