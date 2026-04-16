@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Settings, CheckCircle2, Sparkles, MessageCircle } from 'lucide-react';
+import { Settings, CheckCircle2, Sparkles, MessageCircle, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadUserPrefs, saveUserPrefs, type TonePresetId } from '@/lib/user-prefs';
+import { loadScheduleConfig, executeScheduledTask } from '@/lib/schedule-persistence';
 
 interface PresetOption {
   id: TonePresetId;
