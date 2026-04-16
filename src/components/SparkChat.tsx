@@ -3,10 +3,12 @@ import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
-import type { ChatMessage, ContentItem, ChoiceOption } from '../types/spark';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
 import ReviewCard from './ReviewCard';
+import DistributionCard from './DistributionCard';
+import ScheduleCard from './ScheduleCard';
 
 function SparkAvatar({ size = 32 }: { size?: number }) {
   return (
