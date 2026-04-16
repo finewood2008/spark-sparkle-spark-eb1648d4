@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, AlertCircle, CheckCircle2, RotateCcw, Loader2, X } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, RotateCcw, Loader2, X, Sparkles, Briefcase, Scissors } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem, ReviewTaskData, ChatMessage } from '../types/spark';
 import { streamChat } from '../lib/ai-stream';
@@ -56,15 +56,14 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
     toast.success('内容已通过审核');
   };
 
-  const handleSubmitReject = async () => {
-    const reason = rejectReason.trim();
-    if (!reason) {
+  const runRegenerate = async (reason: string, presetLabel?: string) => {
+    if (!reason.trim()) {
       toast.error('请填写打回意见');
       return;
     }
 
     updateStatus('rejected');
-    appendUserMessage(`[已打回] 修改要求：${reason}`);
+    appendUserMessage(presetLabel ? `[快速微调] ${presetLabel}` : `[已打回] 修改要求：${reason}`);
     setRejecting(false);
 
     setRegenerating(true);
