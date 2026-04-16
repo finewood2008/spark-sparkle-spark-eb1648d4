@@ -257,41 +257,71 @@ function AuthPage() {
         {/* Login form */}
         {tab === 'login' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="relative">
-              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9"
-                placeholder="邮箱"
-                type="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-              />
+            {lockUntil > Date.now() && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+                <ShieldAlert size={14} className="mt-0.5 shrink-0" />
+                <span>登录失败次数过多，账户已临时锁定。请 <span className="font-semibold">{lockRemain}s</span> 后再试。</span>
+              </div>
+            )}
+            <div>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className={`spark-input pl-9 ${emailErr ? 'border-destructive focus:ring-destructive/30' : ''}`}
+                  placeholder="邮箱"
+                  type="email"
+                  autoComplete="email"
+                  value={loginEmail}
+                  onChange={(e) => { setLoginEmail(e.target.value); if (emailErr) setEmailErr(''); }}
+                  onBlur={() => loginEmail && setEmailErr(validateEmail(loginEmail))}
+                />
+              </div>
+              {emailErr && (
+                <p className="mt-1.5 ml-1 flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle size={12} /> {emailErr}
+                </p>
+              )}
             </div>
-            <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9 pr-10"
-                type={showPwd ? 'text' : 'password'}
-                placeholder="密码"
-                value={loginPwd}
-                onChange={(e) => setLoginPwd(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+            <div>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className={`spark-input pl-9 pr-10 ${pwdErr ? 'border-destructive focus:ring-destructive/30' : ''}`}
+                  type={showPwd ? 'text' : 'password'}
+                  placeholder="密码（至少 8 位）"
+                  autoComplete="current-password"
+                  value={loginPwd}
+                  onChange={(e) => { setLoginPwd(e.target.value); if (pwdErr) setPwdErr(''); }}
+                  onBlur={() => loginPwd && setPwdErr(validatePwd(loginPwd))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(!showPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {pwdErr && (
+                <p className="mt-1.5 ml-1 flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle size={12} /> {pwdErr}
+                </p>
+              )}
             </div>
             <button
               type="button"
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || lockUntil > Date.now()}
               className="spark-btn-primary w-full h-11 text-base"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>登录 <ArrowRight size={16} /></>}
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : lockUntil > Date.now() ? (
+                <>已锁定 {lockRemain}s</>
+              ) : (
+                <>登录 <ArrowRight size={16} /></>
+              )}
             </button>
 
             <p className="text-center text-xs text-muted-foreground pt-1">
