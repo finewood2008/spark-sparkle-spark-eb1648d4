@@ -41,6 +41,24 @@ export interface ChatMessage {
   reviewTask?: ReviewTaskData;
   distribution?: DistributionData;
   scheduleCard?: ScheduleCardData;
+  metricsCard?: MetricsCardData;
+}
+
+export interface MetricsCardData {
+  reviewItemId: string;
+  title: string;
+  platform: string; // 'all' | Platform
+  publishedPlatforms: string[];
+  fetchedAt: string;
+  metrics: {
+    views: number;
+    likes: number;
+    comments: number;
+    saves: number;
+    shares: number;
+  };
+  aiInsight: string;
+  source: 'mock' | 'real';
 }
 
 export type ContentStatus = 'draft' | 'reviewing' | 'approved' | 'published' | 'rejected';

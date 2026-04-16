@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Loader2, CheckCircle2, BarChart3, Rocket, Check } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { loadUserPrefs } from '../lib/user-prefs';
+import { supabase } from '@/integrations/supabase/client';
 import type { Platform, DistributionData } from '../types/spark';
 import type { ReportData } from './DataReportCard';
 import { toast } from 'sonner';
@@ -37,6 +38,7 @@ export default function DistributionCard({ data }: DistributionCardProps) {
   const [selected, setSelected] = useState<Platform[]>(initialDefaults);
   const [publishing, setPublishing] = useState(false);
   const [publishedTo, setPublishedTo] = useState<Platform[]>(data.publishedPlatforms || []);
+  const [fetchingTest, setFetchingTest] = useState(false);
 
   const isSuccess = publishedTo.length > 0;
 
@@ -55,14 +57,30 @@ export default function DistributionCard({ data }: DistributionCardProps) {
     // Simulate platform API calls (1.2s)
     await new Promise(resolve => setTimeout(resolve, 1200));
 
+    const publishedAt = new Date().toISOString();
+
     // Update content status to published
     if (item) {
       const updated = contents.map(c =>
         c.id === item.id
-          ? { ...c, status: 'published' as const, publishedAt: new Date().toISOString() }
+          ? { ...c, status: 'published' as const, publishedAt }
           : c
       );
       setContents(updated);
+    }
+
+    // Persist to Supabase so the cron job can pick it up in 24h
+    try {
+      await supabase
+        .from('review_items')
+        .update({
+          status: 'published',
+          published_at: publishedAt,
+          published_platforms: selected,
+        })
+        .eq('id', data.contentId);
+    } catch (err) {
+      console.error('[distribution] failed to persist published_at:', err);
     }
 
     setPublishedTo(selected);
@@ -75,10 +93,31 @@ export default function DistributionCard({ data }: DistributionCardProps) {
     addMessage({
       id: `${Date.now()}-published`,
       role: 'assistant',
-      content: `🎉 「${data.title}」已成功发布至 ${platformLabels}！数据每小时刷新一次，明天早上我会汇总一份数据简报给你。`,
+      content: `🎉 「${data.title}」已成功发布至 ${platformLabels}！我会在 24 小时后自动拉取各平台的真实互动数据并推送给你 📊`,
       timestamp: new Date().toISOString(),
     });
     toast.success(`已发布至 ${selected.length} 个平台`);
+  };
+
+  const handleTestFetchNow = async () => {
+    setFetchingTest(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('fetch-metrics', {
+        body: { force: true, contentId: data.contentId },
+      });
+      if (error) throw error;
+      const processed = (result as { processed?: number })?.processed ?? 0;
+      if (processed > 0) {
+        toast.success(`✨ 已拉取 ${processed} 条内容数据，请稍候查看对话流`);
+      } else {
+        toast.info('暂无可拉取的已发布内容');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '拉取失败';
+      toast.error(`拉取失败：${msg}`);
+    } finally {
+      setFetchingTest(false);
+    }
   };
 
   const handleViewData = () => {
@@ -192,13 +231,24 @@ export default function DistributionCard({ data }: DistributionCardProps) {
             )}
           </button>
         ) : (
-          <button
-            onClick={handleViewData}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-green-300 text-green-700 text-[13px] font-medium hover:bg-green-50 transition-colors"
-          >
-            <BarChart3 size={14} />
-            查看数据
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleViewData}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-green-300 text-green-700 text-[13px] font-medium hover:bg-green-50 transition-colors"
+            >
+              <BarChart3 size={14} />
+              查看数据
+            </button>
+            <button
+              onClick={handleTestFetchNow}
+              disabled={fetchingTest}
+              title="立即触发数据回流（开发测试用，正式环境会在 24 小时后自动触发）"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[12px] font-medium hover:bg-blue-100 transition-colors disabled:opacity-60"
+            >
+              {fetchingTest ? <Loader2 size={12} className="animate-spin" /> : '⚡'}
+              立即拉取
+            </button>
+          </div>
         )}
       </div>
     </div>
