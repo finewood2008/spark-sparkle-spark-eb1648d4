@@ -96,6 +96,7 @@ export async function syncPrefsFromCloud(): Promise<UserPreferences> {
       defaultLength: ((data as any).default_length as UserPreferences['defaultLength']) || defaultPrefs.defaultLength,
       autoCta: (data as any).auto_cta ?? defaultPrefs.autoCta,
       coverStyle: (data as any).cover_style || defaultPrefs.coverStyle,
+      tonePreset: loadUserPrefs().tonePreset, // 仅本地存储（数据库暂未加列）
     };
     saveLocal(prefs);
     return prefs;
