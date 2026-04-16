@@ -227,6 +227,75 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_tasks: {
+        Row: {
+          created_at: string
+          days_of_week: number[]
+          device_id: string
+          enabled: boolean
+          frequency: string
+          id: string
+          kind: string
+          log_content_id: string | null
+          log_error: string | null
+          log_platform: string | null
+          log_status: string | null
+          log_timestamp: string | null
+          log_topic: string | null
+          platforms: string[]
+          posts_per_day: number
+          scheduled_times: string[]
+          style: string
+          topics: string[]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          days_of_week?: number[]
+          device_id?: string
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          kind?: string
+          log_content_id?: string | null
+          log_error?: string | null
+          log_platform?: string | null
+          log_status?: string | null
+          log_timestamp?: string | null
+          log_topic?: string | null
+          platforms?: string[]
+          posts_per_day?: number
+          scheduled_times?: string[]
+          style?: string
+          topics?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          days_of_week?: number[]
+          device_id?: string
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          kind?: string
+          log_content_id?: string | null
+          log_error?: string | null
+          log_platform?: string | null
+          log_status?: string | null
+          log_timestamp?: string | null
+          log_topic?: string | null
+          platforms?: string[]
+          posts_per_day?: number
+          scheduled_times?: string[]
+          style?: string
+          topics?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           auto_cta: boolean
