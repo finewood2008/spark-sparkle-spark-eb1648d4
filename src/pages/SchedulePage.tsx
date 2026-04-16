@@ -383,14 +383,39 @@ function ExecutionLog({ logs }: { logs: ScheduleLogEntry[] }) {
 // --- Main Page ---
 export default function SchedulePage() {
   const { contents, setContents, setSelectedContentId, brand, addMessage } = useAppStore();
-  const [config, setConfig] = useState<ScheduleConfig>(loadSchedule);
-  const [logs, setLogs] = useState<ScheduleLogEntry[]>(loadLogs);
+  const [config, setConfig] = useState<ScheduleConfig>(DEFAULT_CONFIG);
+  const [logs, setLogs] = useState<ScheduleLogEntry[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [activeSection, setActiveSection] = useState<'config' | 'timeline' | 'log'>('config');
 
+  // Initial load from Supabase + realtime subscription
   useEffect(() => {
-    saveSchedule(config);
-  }, [config]);
+    let mounted = true;
+    (async () => {
+      const [cfg, lgs] = await Promise.all([loadScheduleConfig(), loadScheduleLogs()]);
+      if (!mounted) return;
+      setConfig(cfg);
+      setLogs(lgs);
+      setLoaded(true);
+    })();
+    const unsubscribe = subscribeScheduleChanges(
+      (cfg) => setConfig(cfg),
+      async () => {
+        const lgs = await loadScheduleLogs();
+        setLogs(lgs);
+      },
+    );
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Persist config changes (skip until first cloud load completes)
+  useSkipFirst(config, (cfg) => {
+    if (loaded) saveScheduleConfig(cfg);
+  });
 
   const toggleEnabled = () => {
     setConfig(prev => ({ ...prev, enabled: !prev.enabled }));
