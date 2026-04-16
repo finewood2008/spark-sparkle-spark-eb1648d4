@@ -353,7 +353,14 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const handleSave = () => {
     const updated = contents.map(c =>
       c.id === item.id
-        ? { ...c, title: editTitle, content: editContent, updatedAt: new Date().toISOString() }
+        ? {
+            ...c,
+            title: editTitle,
+            content: editContent,
+            cta: editCta,
+            tags: editTags,
+            updatedAt: new Date().toISOString(),
+          }
         : c
     );
     setContents(updated);
@@ -422,14 +429,37 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
   };
 
-  const handlePublish = () => {
-    const updated = contents.map(c =>
-      c.id === item.id
-        ? { ...c, status: 'published' as const, publishedAt: new Date().toISOString() }
-        : c
-    );
+  const handleSubmitReview = async () => {
+    setSubmitLoading(true);
+    // 如果在编辑态，先把编辑内容合并进来
+    const finalItem: ContentItem = {
+      ...item,
+      title: editing ? editTitle : item.title,
+      content: editing ? editContent : item.content,
+      cta: editing ? editCta : item.cta,
+      tags: editing ? editTags : item.tags,
+      status: 'reviewing',
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = contents.map(c => (c.id === item.id ? finalItem : c));
     setContents(updated);
-    toast.success('内容已发布！');
+
+    try {
+      await saveReviewItem(finalItem, {
+        source: 'manual',
+        taskName: '手动提交审核',
+        triggeredAt: new Date().toISOString(),
+      });
+      toast.success('已提交审核，请前往审核页查看');
+      if (editing) {
+        setEditing(false);
+        setToolbarPos(null);
+      }
+    } catch {
+      toast.error('提交审核失败，请重试');
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   return (
