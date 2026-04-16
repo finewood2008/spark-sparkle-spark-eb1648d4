@@ -358,6 +358,19 @@ function AuthPage() {
                   <AlertCircle size={12} /> {pwdErr}
                 </p>
               )}
+              <div className="mt-1.5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(loginEmail);
+                    setForgotSent(false);
+                    setForgotOpen(true);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-spark-orange transition"
+                >
+                  忘记密码？
+                </button>
+              </div>
             </div>
             <button
               type="button"
