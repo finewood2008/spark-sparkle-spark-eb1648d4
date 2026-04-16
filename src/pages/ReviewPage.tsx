@@ -109,7 +109,12 @@ function formatTime(iso: string) {
   });
 }
 
-export default function ReviewPage() {
+interface ReviewPageProps {
+  embedded?: boolean;
+  onClose?: () => void;
+}
+
+export default function ReviewPage({ embedded = false, onClose }: ReviewPageProps = {}) {
   const [entries, setEntries] = useState<ReviewHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -296,21 +301,41 @@ export default function ReviewPage() {
 
   return (
     <div
-      className="min-h-screen bg-background"
-      style={{
-        background:
-          'linear-gradient(180deg, oklch(0.95 0.04 70 / 20%), oklch(0.985 0.002 90))',
-      }}
+      className={embedded ? 'h-full bg-background' : 'min-h-screen bg-background'}
+      style={
+        embedded
+          ? undefined
+          : {
+              background:
+                'linear-gradient(180deg, oklch(0.95 0.04 70 / 20%), oklch(0.985 0.002 90))',
+            }
+      }
     >
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div
+        className={
+          embedded
+            ? 'h-full px-4 py-4 flex flex-col'
+            : 'max-w-7xl mx-auto px-4 py-6'
+        }
+      >
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
-          <Link
-            to="/"
-            className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft size={18} />
-          </Link>
+          {embedded ? (
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              title="关闭"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            <Link
+              to="/"
+              className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+          )}
           <h1 className="text-lg font-bold text-foreground">审核中心</h1>
           <button
             onClick={fetchHistory}
@@ -322,7 +347,13 @@ export default function ReviewPage() {
         </div>
 
         {/* Two-column layout */}
-        <div className="flex flex-col md:flex-row gap-4 md:gap-5 md:h-[calc(100vh-7rem)]">
+        <div
+          className={
+            embedded
+              ? 'flex flex-col md:flex-row gap-4 md:gap-5 flex-1 min-h-0'
+              : 'flex flex-col md:flex-row gap-4 md:gap-5 md:h-[calc(100vh-7rem)]'
+          }
+        >
           {/* Left: list panel */}
           <div className="md:w-[40%] rounded-2xl bg-card shadow-lg border border-border flex flex-col overflow-hidden">
             {/* Tabs */}

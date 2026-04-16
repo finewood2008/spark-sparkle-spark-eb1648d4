@@ -6,6 +6,7 @@ import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
 import SettingsPage from '../pages/SettingsPage';
+import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
@@ -15,6 +16,7 @@ export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
   const [pulseKey, setPulseKey] = useState(0);
   const prevCountRef = useRef(0);
@@ -76,7 +78,7 @@ export default function ChatLayout() {
               description: title.length > 40 ? `${title.slice(0, 40)}…` : title,
               action: {
                 label: '去审核',
-                onClick: () => { window.location.href = '/review'; },
+                onClick: () => { setReviewOpen(true); },
               },
               duration: 6000,
             });
@@ -113,7 +115,7 @@ export default function ChatLayout() {
             <FileText size={18} />
           </button>
           <button
-            onClick={() => { window.location.href = '/review'; }}
+            onClick={() => setReviewOpen(true)}
             className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
             title="审核中心"
           >
@@ -177,6 +179,21 @@ export default function ChatLayout() {
           </SheetHeader>
           <div className="flex-1 overflow-hidden">
             <SettingsPage />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Review center drawer */}
+      <Sheet open={reviewOpen} onOpenChange={setReviewOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-none md:max-w-[1100px] p-0 bg-[#FAFAF8] flex flex-col"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>审核中心</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <ReviewPage embedded onClose={() => setReviewOpen(false)} />
           </div>
         </SheetContent>
       </Sheet>
