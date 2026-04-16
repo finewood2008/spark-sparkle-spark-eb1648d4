@@ -40,6 +40,7 @@ export default function DistributionCard({ data }: DistributionCardProps) {
   const [publishing, setPublishing] = useState(false);
   const [publishedTo, setPublishedTo] = useState<Platform[]>(data.publishedPlatforms || []);
   const [fetchingTest, setFetchingTest] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
   const [previewPlatform, setPreviewPlatform] = useState<Platform | null>(initialDefaults[0] ?? null);
 
   // Keep preview tab in sync with selection (auto-pick first selected if current is unselected)
@@ -137,22 +138,61 @@ export default function DistributionCard({ data }: DistributionCardProps) {
     }
   };
 
-  const handleViewData = () => {
-    // Push a mock data report card after a brief delay
-    const mockReport: ReportData = {
-      title: data.title,
-      platform: publishedTo[0] || 'xiaohongshu',
-      metrics: { views: 0, likes: 0, comments: 0, saves: 0 },
-      sparkComment: '内容刚刚发布，数据正在统计中...',
-      sparkAdvice: '内容刚发布，预计 1 小时后会有初步数据。建议关注首小时的互动率，这通常是判断爆款的关键指标。',
-    };
-    addMessage({
-      id: `${Date.now()}-report`,
-      role: 'assistant',
-      content: '📊 内容刚发布，初步数据如下（每小时刷新）：',
-      timestamp: new Date().toISOString(),
-      reportData: mockReport as unknown as Record<string, unknown>,
-    });
+  const handleViewData = async () => {
+    if (loadingReport) return;
+    setLoadingReport(true);
+    try {
+      // Pull real metrics from content_metrics (aggregate "all" row preferred)
+      const { data: rows, error } = await supabase
+        .from('content_metrics')
+        .select('*')
+        .eq('review_item_id', data.contentId)
+        .order('fetched_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+
+      const aggregate = rows?.find(r => r.platform === 'all') || rows?.[0];
+
+      if (!aggregate) {
+        toast.info('暂无数据，请点「立即拉取」获取最新指标');
+        return;
+      }
+
+      const report: ReportData = {
+        title: data.title,
+        platform: (aggregate.platform === 'all'
+          ? publishedTo[0] || 'xiaohongshu'
+          : aggregate.platform) as Platform,
+        metrics: {
+          views: aggregate.views ?? 0,
+          likes: aggregate.likes ?? 0,
+          comments: aggregate.comments ?? 0,
+          saves: aggregate.saves ?? 0,
+        },
+        sparkComment: aggregate.ai_insight || '数据已就绪',
+        sparkAdvice: aggregate.ai_insight || undefined,
+      };
+
+      const fetchedLabel = new Date(aggregate.fetched_at).toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      addMessage({
+        id: `${Date.now()}-report`,
+        role: 'assistant',
+        content: `📊 「${data.title}」最新数据（更新于 ${fetchedLabel}）：`,
+        timestamp: new Date().toISOString(),
+        reportData: report as unknown as Record<string, unknown>,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加载失败';
+      toast.error(`加载数据失败：${msg}`);
+    } finally {
+      setLoadingReport(false);
+    }
   };
 
   return (
@@ -284,9 +324,10 @@ export default function DistributionCard({ data }: DistributionCardProps) {
           <div className="flex gap-2">
             <button
               onClick={handleViewData}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-green-300 text-green-700 text-[13px] font-medium hover:bg-green-50 transition-colors"
+              disabled={loadingReport}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-green-300 text-green-700 text-[13px] font-medium hover:bg-green-50 transition-colors disabled:opacity-60"
             >
-              <BarChart3 size={14} />
+              {loadingReport ? <Loader2 size={14} className="animate-spin" /> : <BarChart3 size={14} />}
               查看数据
             </button>
             <button
