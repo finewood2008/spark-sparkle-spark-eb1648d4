@@ -565,15 +565,73 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       )}
 
-      {/* Tags */}
-      {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {item.tags.map(tag => (
-            <span key={tag} className="text-[11px] text-spark-orange bg-spark-orange/10 px-2 py-0.5 rounded-full">
-              #{tag}
-            </span>
-          ))}
+      {/* CTA (edit mode) */}
+      {editing && (
+        <div className="mt-3">
+          <label className="block text-[11px] text-[#999] mb-1">CTA（行动号召）</label>
+          <input
+            value={editCta}
+            onChange={(e) => setEditCta(e.target.value)}
+            placeholder="如：点击关注，下期更新…"
+            className="w-full text-[13px] text-[#555] border border-[#E5E4E2] rounded-lg px-3 py-1.5 outline-none focus:border-spark-orange"
+            maxLength={100}
+          />
         </div>
+      )}
+
+      {/* Tags */}
+      {editing ? (
+        <div className="mt-3">
+          <label className="block text-[11px] text-[#999] mb-1">标签</label>
+          <div className="flex flex-wrap items-center gap-1.5 border border-[#E5E4E2] rounded-lg px-2 py-1.5 focus-within:border-spark-orange">
+            {editTags.map(tag => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 text-[11px] text-spark-orange bg-spark-orange/10 px-2 py-0.5 rounded-full"
+              >
+                #{tag}
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="hover:text-spark-orange/70"
+                  aria-label={`删除 ${tag}`}
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            <input
+              value={tagDraft}
+              onChange={(e) => setTagDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+                  e.preventDefault();
+                  addTag();
+                } else if (e.key === 'Backspace' && !tagDraft && editTags.length > 0) {
+                  removeTag(editTags[editTags.length - 1]);
+                }
+              }}
+              onBlur={() => tagDraft && addTag()}
+              placeholder={editTags.length === 0 ? '输入标签，回车添加' : ''}
+              className="flex-1 min-w-[100px] text-[12px] text-[#555] outline-none bg-transparent"
+              maxLength={20}
+            />
+          </div>
+        </div>
+      ) : (
+        item.tags && item.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {item.tags.map(tag => (
+              <span key={tag} className="text-[11px] text-spark-orange bg-spark-orange/10 px-2 py-0.5 rounded-full">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Non-edit CTA preview */}
+      {!editing && item.cta && (
+        <p className="text-[12px] text-[#999] italic mt-2">👉 {item.cta}</p>
       )}
 
       {/* Actions */}
@@ -584,7 +642,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               {expanded ? '收起' : '展开全文'}
             </button>
-            <button onClick={() => setEditDialogOpen(true)} className="content-card-btn">
+            <button onClick={enterEditMode} className="content-card-btn">
               <Pencil size={13} /> 编辑
             </button>
             <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
@@ -609,10 +667,12 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               <Palette size={13} /> 换风格
             </button>
             <button
-              onClick={() => onAction ? onAction('distribute', item) : handlePublish()}
+              onClick={handleSubmitReview}
+              disabled={submitLoading}
               className="content-card-btn text-spark-orange"
             >
-              <Upload size={13} /> 发布
+              {submitLoading ? <Loader2 size={13} className="animate-spin" /> : <ClipboardCheck size={13} />}
+              {submitLoading ? '提交中...' : '提交审核'}
             </button>
             <button
               onClick={() => { toast.success('已存入草稿箱'); }}
@@ -647,17 +707,20 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
                 <Undo2 size={13} /> 撤销
               </button>
             )}
-            <button onClick={() => { setEditing(false); setToolbarPos(null); setUndoStack([]); }} className="content-card-btn">取消</button>
+            <button
+              onClick={() => {
+                setEditing(false);
+                setToolbarPos(null);
+                setUndoStack([]);
+                setTagDraft('');
+              }}
+              className="content-card-btn"
+            >
+              取消
+            </button>
           </>
         )}
       </div>
-
-      {/* Edit Dialog */}
-      <ContentEditDialog
-        item={item}
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-      />
     </div>
   );
 }
