@@ -70,7 +70,7 @@ ${brandContext || ""}`;
         response = await fetch(GEMINI_URL, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${GOOGLE_GEMINI_API_KEY}`,
+            "x-goog-api-key": GOOGLE_GEMINI_API_KEY,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
