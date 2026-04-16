@@ -31,10 +31,34 @@ export default function ChatLayout() {
       if (!error && typeof count === 'number') setReviewingCount(count);
     };
     fetchCount();
+
     // Refresh on tab focus so badge updates after returning from /review
     const onFocus = () => fetchCount();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+
+    // Realtime subscription: any insert/update/delete on review_items → re-count
+    const { user, isAuthenticated } = useAuthStore.getState();
+    const channel = supabase
+      .channel('review-items-badge')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'review_items' },
+        (payload) => {
+          // Scope filter (client-side) — only react to rows belonging to this user/device
+          const row = (payload.new || payload.old) as { user_id?: string | null; device_id?: string | null } | null;
+          if (!row) return;
+          const matches = isAuthenticated && user?.id
+            ? row.user_id === user.id
+            : row.user_id == null && row.device_id === 'default';
+          if (matches) fetchCount();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
